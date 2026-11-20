@@ -19,6 +19,7 @@ from aiogram.types import (
 )
 
 from bot.config import Settings
+from bot.ethiopian_calendar import format_ethiopian, parse_ethiopian_datetime
 from bot.states import AdminBroadcast, Registration
 from bot.storage import JsonStore
 
@@ -92,6 +93,7 @@ async def show_admin_home(message: Message, state: FSMContext, store: JsonStore,
     await message.answer(
         "🛡 <b>6Kilo GbiGubae | Admin workspace</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Today: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
         f"👥 Registered members: <b>{len(users)}</b>\n"
         "Choose an operation below.",
         reply_markup=admin_menu(),
@@ -199,7 +201,7 @@ async def admin_schedules(callback: CallbackQuery, store: JsonStore, settings: S
         for item in schedules[:15]:
             when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
             lines.append(
-                f"#{item['id']} · {when:%d %b %Y, %H:%M} · "
+                f"#{item['id']} · {{format_ethiopian(when, ZoneInfo(settings.timezone))}} · "
                 f"{escape(item['batch'])}\n{escape(item['message'][:70])}"
             )
         text = "\n".join(lines)
@@ -453,7 +455,7 @@ async def help_command(message: Message, settings: Settings):
             "/admin — Open admin workspace\n"
             "/users — Member statistics\n"
             "/broadcast — Guided announcement composer\n"
-            "/schedule YYYY-MM-DD HH:MM | batch | message — Schedule a message\n"
+            "/schedule YYYY-MM-DD HH:MM | batch | message — Schedule using Ethiopian date (E.C.)\n"
             "/schedules — View pending schedules\n"
             "/cancel_schedule ID — Cancel a schedule\n"
             "/menu — Open workspace"
@@ -531,9 +533,10 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
     if len(parts) != 3:
         await message.answer(
             "🗓 <b>Schedule an announcement</b>\n\n"
-            "Format: /schedule YYYY-MM-DD HH:MM | batch | message\n"
+            "Format: /schedule YYYY-MM-DD HH:MM | batch | message (Ethiopian calendar)\n"
             "Use 'all' for every registered member.\n"
-            "Example: /schedule 2026-11-22 09:00 | 1st Year | Class starts at 9 AM"
+            "Example: /schedule 2019-03-13 09:00 | 1st Year | Class starts at 9 AM\n"
+            "Months: Meskerem, Tikimt, Hidar, Tahsas, Tir, Yekatit, Megabit, Miyazya, Ginbot, Sene, Hamle, Nehase, Pagume."
         )
         return
     time_text, target, text = parts
@@ -541,10 +544,9 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
         await message.answer("Invalid audience or message. Message length must be 1–4,096 characters.")
         return
     try:
-        local_time = datetime.strptime(time_text, "%Y-%m-%d %H:%M")
-        scheduled_at = local_time.replace(tzinfo=ZoneInfo(settings.timezone))
+        scheduled_at = parse_ethiopian_datetime(time_text, ZoneInfo(settings.timezone))
     except (ValueError, ZoneInfoNotFoundError):
-        await message.answer("Invalid date/time or timezone. Use YYYY-MM-DD HH:MM.")
+        await message.answer("Invalid Ethiopian date/time or timezone. Use YYYY-MM-DD HH:MM (E.C.).")
         return
     if scheduled_at <= datetime.now(scheduled_at.tzinfo):
         await message.answer("The scheduled time must be in the future.")
@@ -555,7 +557,7 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
     await message.answer(
         "✅ <b>Announcement scheduled</b>\n\n"
         f"Reference: <b>#{item['id']}</b>\nAudience: <b>{escape(target)}</b>\n"
-        f"Time: <b>{scheduled_at.strftime('%d %b %Y, %H:%M %Z')}</b>"
+        f"Time: <b>{format_ethiopian(scheduled_at, ZoneInfo(settings.timezone))}</b>"
     )
 
 
