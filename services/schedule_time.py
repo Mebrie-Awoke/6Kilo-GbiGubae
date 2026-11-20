@@ -12,6 +12,7 @@ def calculate_next_run(
     scheduled_at: datetime,
     now: datetime,
     cron_expr: str | None = None,
+    monthly_day: int | None = None,
 ) -> datetime | None:
     """Return the next future occurrence, preserving the original wall-clock time."""
     if schedule_type == ScheduleType.CUSTOM:
@@ -26,6 +27,7 @@ def calculate_next_run(
         return candidate
 
     if schedule_type == ScheduleType.MONTHLY:
+        anchor_day = monthly_day or scheduled_at.day
         candidate = scheduled_at
         while candidate <= now:
             year = candidate.year
@@ -33,7 +35,7 @@ def calculate_next_run(
             if month > 12:
                 month = 1
                 year += 1
-            day = min(scheduled_at.day, calendar.monthrange(year, month)[1])
+            day = min(anchor_day, calendar.monthrange(year, month)[1])
             candidate = scheduled_at.replace(year=year, month=month, day=day)
         return candidate
 
