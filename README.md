@@ -31,7 +31,15 @@ In GitHub, open **Settings → Secrets and variables → Actions** and add:
 - `DATABASE_URL`
 - `SUPER_ADMIN_ID`
 
-The scheduled worker uses these secrets to connect directly to PostgreSQL and Telegram. Do not commit tokens or database URLs to the repository.
+The scheduled worker uses these secrets to connect directly to PostgreSQL and Telegram. Use a publicly reachable PostgreSQL connection URL for the GitHub Actions secret (not a Render-only internal hostname); configure your database provider's network access rules if it restricts external connections. Do not commit tokens or database URLs to the repository.
+
+Generate a webhook secret locally with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Paste the generated value into Render's `WEBHOOK_SECRET` environment variable.
 
 ## Deploy to Render
 
