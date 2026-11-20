@@ -190,7 +190,7 @@ async def admin_members(callback: CallbackQuery, store: JsonStore, settings: Set
     lines = ["👥 <b>የአባላት ማጠቃለያ</b>", "━━━━━━━━━━━━━━━━━━",
              f"የተመዘገቡ: <b>{len(users)}</b>"]
     lines.extend(f"• {escape(display_batch(batch))} — {count}" for batch, count in counts.items())
-    lines.append("\nUse /users for the detailed count.")
+    lines.append("\nዝርዝር ቁጥር ለማየት /users ይጠቀሙ።")
     await callback.message.edit_text("\n".join(lines), reply_markup=admin_menu())
     await callback.answer()
 
@@ -209,7 +209,7 @@ async def admin_schedules(callback: CallbackQuery, store: JsonStore, settings: S
             when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
             lines.append(
                 f"#{item['id']} · {format_ethiopian(when, ZoneInfo(settings.timezone))} · "
-                f"{escape(item['batch'])}\n{escape(item['message'][:70])}"
+                f"{escape(display_batch(item['batch']))}\n{escape(item['message'][:70])}"
             )
         text = "\n".join(lines)
     await callback.message.edit_text(text, reply_markup=admin_menu())
@@ -264,7 +264,7 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
         try:
             target = settings.batches[int(selected)]
         except (ValueError, IndexError):
-            await callback.answer("Invalid audience.", show_alert=True)
+            await callback.answer("የተመረጠው ተቀባይ ቡድን ትክክል አይደለም።", show_alert=True)
             return
         label = display_batch(target)
     await state.update_data(target=target, target_label=label)
@@ -431,7 +431,7 @@ async def profile(message: Message, store: JsonStore):
     if not user:
         await message.answer("ገና አልተመዘገቡም። /start ይጠቀሙ።")
         return
-    await message.answer(f"👤 <b>{escape(user['name'])}</b>\n🎓 {escape(user['batch'])}")
+    await message.answer(f"👤 <b>{escape(user['name'])}</b>\n🎓 {escape(display_batch(user['batch']))}")
 
 
 @router.message(Command("edit_batch"))
@@ -442,7 +442,7 @@ async def edit_batch(message: Message, state: FSMContext, store: JsonStore, sett
         return
     await state.update_data(name=user["name"])
     await state.set_state(Registration.choosing_batch)
-    await message.answer("🎓 Choose your new batch:", reply_markup=batch_keyboard(settings.batches))
+    await message.answer("🎓 አዲሱን የትምህርት ዓመት ይምረጡ።", reply_markup=batch_keyboard(settings.batches))
 
 
 @router.message(Command("cancel"))
@@ -481,7 +481,7 @@ async def help_command(message: Message, settings: Settings):
 @router.message(Command("users"))
 async def users_command(message: Message, store: JsonStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ This command is restricted to administrators.")
+        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
@@ -490,7 +490,7 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
             counts[user["batch"]] += 1
     lines = ["👥 <b>የአባላት ሪፖርት</b>", "━━━━━━━━━━━━━━━━━━",
              f"ጠቅላላ የተመዘገቡ: <b>{len(users)}</b>", ""]
-    lines.extend(f"• {escape(batch)}: <b>{count}</b>" for batch, count in counts.items())
+    lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
     await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
@@ -514,7 +514,7 @@ async def send_to_target(message: Message, store: JsonStore, target: str, text: 
 @router.message(Command("broadcast"))
 async def broadcast(message: Message, state: FSMContext, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ This command is restricted to administrators.")
+        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
     payload = command_payload(message)
     if payload:
@@ -534,7 +534,7 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
 @router.message(Command("schedule"))
 async def schedule_message(message: Message, store: JsonStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ This command is restricted to administrators.")
+        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
     parts = [part.strip() for part in command_payload(message).split("|", 2)]
     if len(parts) != 3:
@@ -571,7 +571,7 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
 @router.message(Command("schedules"))
 async def list_schedules(message: Message, store: JsonStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ This command is restricted to administrators.")
+        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
     schedules = await store.list_schedules()
     if not schedules:
@@ -581,7 +581,7 @@ async def list_schedules(message: Message, store: JsonStore, settings: Settings)
     for item in schedules[:30]:
         when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
         lines.append(
-            f"#{item['id']} · {format_ethiopian(when, ZoneInfo(settings.timezone))} · {escape(item['batch'])}\n"
+            f"#{item['id']} · {format_ethiopian(when, ZoneInfo(settings.timezone))} · {escape(display_batch(item['batch']))}\n"
             f"{escape(item['message'][:80])}"
         )
     await message.answer("\n\n".join(lines), reply_markup=admin_menu())
@@ -590,7 +590,7 @@ async def list_schedules(message: Message, store: JsonStore, settings: Settings)
 @router.message(Command("cancel_schedule"))
 async def cancel_schedule(message: Message, store: JsonStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ This command is restricted to administrators.")
+        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
     try:
         schedule_id = int(command_payload(message))
@@ -598,6 +598,6 @@ async def cancel_schedule(message: Message, store: JsonStore, settings: Settings
         await message.answer("አጠቃቀም: /cancel_schedule ID")
         return
     if await store.cancel_schedule(schedule_id):
-        await message.answer(f"✅ Scheduled announcement #{schedule_id} cancelled.")
+        await message.answer(f"✅ በቁጥር #{schedule_id} ተሰርዟል።")
     else:
         await message.answer("በዚህ መለያ ቁጥር የተያዘ ማስታወቂያ አልተገኘም።")
