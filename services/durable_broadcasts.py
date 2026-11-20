@@ -115,12 +115,18 @@ async def materialize_due_schedules(now: datetime | None = None) -> int:
                     )
                 created_runs += 1
 
-            next_run = calculate_next_run(
-                schedule.type,
-                scheduled_for,
-                now,
-                schedule.cron_expr,
-            )
+            try:
+                next_run = calculate_next_run(
+                    schedule.type,
+                    scheduled_for,
+                    now,
+                    schedule.cron_expr,
+                    schedule.monthly_day,
+                )
+            except Exception:
+                logger.exception("Could not calculate next run for schedule #%s", schedule.id)
+                next_run = None
+
             if next_run is None:
                 schedule.is_active = False
             else:
