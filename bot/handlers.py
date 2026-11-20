@@ -73,37 +73,37 @@ def batch_keyboard(batches: tuple[str, ...]) -> ReplyKeyboardMarkup:
 
 def member_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👤 መገለጫዬ", callback_data="member:profile"),
-         InlineKeyboardButton(text="🎓 የትምህርት ዓመት ቀይር", callback_data="member:batch")],
-        [InlineKeyboardButton(text="ℹ️ እገዛ", callback_data="member:help")],
+        [InlineKeyboardButton(text="👤 My Profile", callback_data="member:profile"),
+         InlineKeyboardButton(text="🎓 Change Academic Year", callback_data="member:batch")],
+        [InlineKeyboardButton(text="ℹ️ Help", callback_data="member:help")],
     ])
 
 
 def admin_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 አጠቃላይ እይታ", callback_data="admin:overview"),
-         InlineKeyboardButton(text="👥 አባላት", callback_data="admin:members")],
-        [InlineKeyboardButton(text="📣 አዲስ ማስታወቂያ", callback_data="admin:broadcast"),
-         InlineKeyboardButton(text="🗓 የታቀዱ መልዕክቶች", callback_data="admin:schedules")],
-        [InlineKeyboardButton(text="❔ እገዛ", callback_data="admin:help")],
+        [InlineKeyboardButton(text="📊 Overview", callback_data="admin:overview"),
+         InlineKeyboardButton(text="👥 Members", callback_data="admin:members")],
+        [InlineKeyboardButton(text="📣 New Announcement", callback_data="admin:broadcast"),
+         InlineKeyboardButton(text="🗓 Scheduled Messages", callback_data="admin:schedules")],
+        [InlineKeyboardButton(text="❔ Help", callback_data="admin:help")],
     ])
 
 
 def target_keyboard(settings: Settings) -> InlineKeyboardMarkup:
-    rows = [[InlineKeyboardButton(text="📢 ለሁሉም አባላት", callback_data="broadcast:target:all")]]
+    rows = [[InlineKeyboardButton(text="📢 All Members", callback_data="broadcast:target:all")]]
     rows.extend(
         [InlineKeyboardButton(text=f"🎓 {display_batch(batch)}", callback_data=f"broadcast:target:{index}")]
         for index, batch in enumerate(settings.batches)
     )
-    rows.append([InlineKeyboardButton(text="✖ ሰርዝ", callback_data="broadcast:cancel")])
+    rows.append([InlineKeyboardButton(text="✖ Cancel", callback_data="broadcast:cancel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def confirmation_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ ማስታወቂያውን ላክ", callback_data="broadcast:confirm")],
-        [InlineKeyboardButton(text="✏️ አስተካክል", callback_data="broadcast:edit"),
-         InlineKeyboardButton(text="✖ ሰርዝ", callback_data="broadcast:cancel")],
+        [InlineKeyboardButton(text="✅ Send Announcement", callback_data="broadcast:confirm")],
+        [InlineKeyboardButton(text="✏️ Edit", callback_data="broadcast:edit"),
+         InlineKeyboardButton(text="✖ Cancel", callback_data="broadcast:cancel")],
     ])
 
 
@@ -111,11 +111,11 @@ async def show_admin_home(message: Message, state: FSMContext, store: MongoStore
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await message.answer(
-        "🛡 <b>6ኪሎ ግቢጉባኤ | የአስተዳዳሪ ማዕከል</b>\n"
+        "🛡 <b>6Kilo GbiGubae | Admin Workspace</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"📅 የዛሬ ቀን: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
-        f"👥 የተመዘገቡ አባላት: <b>{len(users)}</b>\n"
-        "ከታች ካሉት አማራጮች ይምረጡ።",
+        f"📅 Ethiopian date: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
+        f"👥 Registered members: <b>{len(users)}</b>\n"
+        "Choose an action below to manage the community.",
         reply_markup=admin_menu(),
     )
 
@@ -469,7 +469,7 @@ async def cancel(message: Message, state: FSMContext, settings: Settings, store:
     if admin_only(settings, message):
         await show_admin_home(message, state, store, settings)
     else:
-        await message.answer("ሂደቱ ተሰርዟል።", reply_markup=ReplyKeyboardRemove())
+        await message.answer("Your current action has been cancelled.", reply_markup=ReplyKeyboardRemove())
 
 
 @router.message(Command("help"))
