@@ -45,9 +45,10 @@ Paste the generated value into Render's `WEBHOOK_SECRET` environment variable.
 
 1. Back up the production PostgreSQL database.
 2. Add all required Render environment variables.
-3. Deploy the service. The Render start command applies Alembic migrations before starting the webhook application.
-4. Confirm `/health/ready` reports that PostgreSQL is connected.
-5. Confirm the Telegram webhook is configured successfully in the Render logs.
+3. From a trusted machine with the updated repository and production database URL configured, inspect the current Alembic revision and run `python -m alembic upgrade head` only after confirming that the existing database matches the repository's migration history.
+4. Confirm the migration completes successfully. Do not continue if the database has no matching Alembic history or reports schema conflicts; reconcile the database first.
+5. Manually deploy the Render service after the migration succeeds.
+6. Confirm `/health/ready` reports that PostgreSQL is connected and the Telegram webhook is configured successfully in the Render logs.
 
 The Render blueprint has automatic deployment disabled so releases can be deliberate. Enable it only after you are comfortable with the migration and release process.
 
