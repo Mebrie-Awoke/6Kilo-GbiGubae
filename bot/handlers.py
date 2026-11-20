@@ -568,6 +568,8 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
     if not valid_target(target, settings) or not text or len(text) > 4096:
         await message.answer("Invalid audience or message. The message must contain 1–4,096 characters.")
         return
+    if target.casefold() != "all":
+        target = normalize_batch(target, settings) or target
     try:
         scheduled_at = parse_ethiopian_datetime(time_text, ZoneInfo(settings.timezone))
     except (ValueError, ZoneInfoNotFoundError):
