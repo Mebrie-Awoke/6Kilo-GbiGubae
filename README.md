@@ -7,7 +7,8 @@ A lightweight Telegram bot for student registration, batch announcements and sch
 - Register members with only their Telegram ID, name and batch.
 - View a profile and change a batch.
 - Send an immediate announcement to one batch or all registered members.
-- Schedule a text announcement for a batch or everyone.
+- Schedule a text announcement using Ethiopian calendar dates for a batch or everyone.
+- Display the current date and scheduled delivery dates in Ethiopian calendar format.
 - List and cancel pending scheduled messages.
 - Protect administrator commands with a configured Telegram user ID.
 - Store data in one JSON file with atomic writes.
@@ -66,11 +67,11 @@ Only the Telegram account configured in SUPER_ADMIN_ID can use these commands.
 - /users — Count members by batch.
 - /broadcast 1st Year | Your message — Send now to one batch.
 - /broadcast all | Your message — Send now to everyone.
-- /schedule 2026-11-22 09:00 | 1st Year | Your message — Schedule in the configured local timezone.
+- /schedule 2019-03-13 09:00 | 1st Year | Your message — Schedule using Ethiopian date/time (E.C.) in the configured local timezone.
 - /schedules — List pending schedules.
 - /cancel_schedule 3 — Cancel schedule number 3.
 
-Scheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
+Schedule dates are entered as `YYYY-MM-DD HH:MM` in the Ethiopian calendar (E.C.). For example, `2019-03-13 09:00` means 13 Hidar 2019 E.C. at 9:00 AM. The bot converts this to an absolute timestamp internally, so delivery remains accurate. Pending schedule lists and confirmations are displayed in Ethiopian calendar format.\n\nScheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
 
 ## Deploy to Render
 
