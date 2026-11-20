@@ -187,7 +187,7 @@ async def handle_view_schedule(callback: types.CallbackQuery, state: FSMContext)
         content_label = "Caption Preview"
     else:
         content = sched.message or "(empty)"
-        msg_preview = content[:200] + "..." if len(content) > 200 else content
+        msg_preview = escape(content[:200] + "..." if len(content) > 200 else content)
         content_label = "Message Preview"
 
     text = (
@@ -331,13 +331,13 @@ async def handle_toggle_schedule(callback: types.CallbackQuery, state: FSMContex
         media_icon = {"photo": "📷", "video": "🎥", "document": "📄"}.get(sched.media_type, "📎")
         if sched.caption:
             content = sched.caption
-            msg_preview = content[:200] + "..." if len(content) > 200 else content
+            msg_preview = escape(content[:200] + "..." if len(content) > 200 else content)
         else:
             msg_preview = f"{media_icon} (no caption)"
         content_label = "Caption Preview"
     else:
         content = sched.message or "(empty)"
-        msg_preview = content[:200] + "..." if len(content) > 200 else content
+        msg_preview = escape(content[:200] + "..." if len(content) > 200 else content)
         content_label = "Message Preview"
 
     text = (
