@@ -25,4 +25,10 @@ jobs:
       - name: Validate Alembic migration graph
         run: python -m alembic heads
       - name: Run unit tests
+        env:
+          BOT_TOKEN: "123456:TEST_TOKEN"
+          SUPER_ADMIN_ID: "1"
+          DATABASE_URL: "postgresql://user:pass@localhost/test_db"
+          WEBHOOK_SECRET: "ci-secret"
+          RENDER_EXTERNAL_URL: "https://example.onrender.com"
         run: python -m unittest discover -s tests -v
