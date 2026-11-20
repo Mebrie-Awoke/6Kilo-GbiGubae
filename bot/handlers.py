@@ -177,7 +177,7 @@ async def menu_command(message: Message, state: FSMContext, store: MongoStore, s
 @router.callback_query(F.data == "admin:overview")
 async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
@@ -194,7 +194,7 @@ async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: S
 @router.callback_query(F.data == "admin:members")
 async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
@@ -212,7 +212,7 @@ async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Se
 @router.callback_query(F.data == "admin:schedules")
 async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     schedules = await store.list_schedules()
     if not schedules:
@@ -233,7 +233,7 @@ async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: 
 @router.callback_query(F.data == "admin:help")
 async def admin_help(callback: CallbackQuery, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     text = (
         "❔ <b>Administrator Guide</b>\n\n"
@@ -251,7 +251,7 @@ async def admin_help(callback: CallbackQuery, settings: Settings):
 @router.callback_query(F.data == "admin:broadcast")
 async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     await state.set_state(AdminBroadcast.choosing_target)
     await callback.message.edit_text(
@@ -265,7 +265,7 @@ async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: 
 @router.callback_query(F.data.startswith("broadcast:target:"))
 async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.choosing_target.state:
         await callback.answer("This announcement session has expired. Please start again.", show_alert=True)
@@ -278,7 +278,7 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
         try:
             target = settings.batches[int(selected)]
         except (ValueError, IndexError):
-            await callback.answer("የተመረጠው ተቀባይ ቡድን ትክክል አይደለም።", show_alert=True)
+            await callback.answer("The selected audience is invalid.", show_alert=True)
             return
         label = display_batch(target)
     await state.update_data(target=target, target_label=label)
@@ -313,10 +313,10 @@ async def compose_broadcast(message: Message, state: FSMContext):
 @router.callback_query(F.data == "broadcast:edit")
 async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.confirming.state:
-        await callback.answer("የማስታወቂያ ሂደቱ ጊዜ አልፎበታል።", show_alert=True)
+        await callback.answer("This announcement session has expired.", show_alert=True)
         return
     await state.set_state(AdminBroadcast.entering_message)
     await callback.message.edit_text("✏️ የተስተካከለውን የማስታወቂያ ጽሑፍ ይላኩ። ለማቋረጥ /cancel ይጠቀሙ።")
@@ -326,18 +326,18 @@ async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: S
 @router.callback_query(F.data == "broadcast:confirm")
 async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.confirming.state:
-        await callback.answer("የማስታወቂያ ሂደቱ ጊዜ አልፎበታል።", show_alert=True)
+        await callback.answer("This announcement session has expired.", show_alert=True)
         return
     data = await state.get_data()
     target, text = data.get("target"), data.get("message")
     if not target or not text or not valid_target(target, settings):
         await state.clear()
-        await callback.answer("የማስታወቂያው መረጃ ያልተሟላ ነው። እባክዎ እንደገና ይጀምሩ።", show_alert=True)
+        await callback.answer("Announcement details are incomplete. Please start again.", show_alert=True)
         return
-    await callback.message.edit_text("⏳ <b>ማስታወቂያው በመላክ ላይ ነው…</b>")
+    await callback.message.edit_text("⏳ <b>Sending announcement…</b>")
     sent, failed, total = await send_to_target(callback.message, store, target, text, settings)
     await state.clear()
     await callback.message.edit_text(
@@ -355,7 +355,7 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: M
 @router.callback_query(F.data == "broadcast:cancel")
 async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings, store: MongoStore):
     if not is_admin(settings, callback.from_user.id):
-        await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
+        await callback.answer("Access denied.", show_alert=True)
         return
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
@@ -363,7 +363,7 @@ async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings:
         f"🛡 <b>የአስተዳዳሪ ማዕከል</b>\nየተመዘገቡ አባላት: <b>{len(users)}</b>",
         reply_markup=admin_menu(),
     )
-    await callback.answer("ማስታወቂያው ተሰርዟል።")
+    await callback.answer("Announcement cancelled.")
 
 
 @router.callback_query(F.data == "member:profile")
@@ -507,7 +507,7 @@ async def users_command(message: Message, store: MongoStore, settings: Settings)
         if user.get("batch") in counts:
             counts[user["batch"]] += 1
     lines = ["👥 <b>የአባላት ሪፖርት</b>", "━━━━━━━━━━━━━━━━━━",
-             f"ጠቅላላ የተመዘገቡ: <b>{len(users)}</b>", ""]
+             f"Total registered: <b>{len(users)}</b>", ""]
     lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
     await message.answer("\n".join(lines), reply_markup=admin_menu())
 
