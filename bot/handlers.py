@@ -88,7 +88,7 @@ def confirmation_keyboard() -> InlineKeyboardMarkup:
 
 async def show_admin_home(message: Message, state: FSMContext, store: JsonStore) -> None:
     await state.clear()
-    users = await store.list_users()
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await message.answer(
         "🛡 <b>6Kilo GbiGubae | Admin workspace</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
@@ -486,7 +486,7 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
 
 
 async def send_to_target(message: Message, store: JsonStore, target: str, text: str) -> tuple[int, int, int]:
-    recipients = await store.list_users(None if target.lower() == "all" else target)
+    recipients = [\n        user for user in await store.list_users(None if target.lower() == "all" else target)\n        if user["telegram_id"] != message.bot.id\n    ]
     sent = failed = 0
     for recipient in recipients:
         try:
