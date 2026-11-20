@@ -223,7 +223,7 @@ async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: S
     lines = ["📊 <b>Community Overview</b>", "━━━━━━━━━━━━━━━━━━",
              f"Total registered members: <b>{len(users)}</b>", ""]
     lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
-    await callback.message.edit_text("\n".join(lines), reply_markup=admin_menu())
+    await callback.message.edit_text("\n".join(lines), reply_markup=None)
     await callback.answer()
 
 
@@ -533,7 +533,6 @@ async def help_command(message: Message, settings: Settings):
         )
 
 
-@router.message(F.text == "👥 Members")
 @router.message(F.text == "👥 Members")
 @router.message(Command("users"))
 async def users_command(message: Message, store: MongoStore, settings: Settings):
