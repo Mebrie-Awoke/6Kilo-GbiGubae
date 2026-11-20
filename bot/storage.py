@@ -1,5 +1,5 @@
 """MongoDB persistence for members and scheduled announcements."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from pymongo import ASCENDING, DESCENDING, ReturnDocument
@@ -17,6 +17,7 @@ class MongoStore:
         self.users = self.db["users"]
         self.schedules = self.db["schedules"]
         self.counters = self.db["counters"]
+        self.locks = self.db["locks"]
 
     async def connect(self) -> None:
         await self.client.admin.command("ping")
@@ -27,6 +28,11 @@ class MongoStore:
             {"$setOnInsert": {"value": 0}},
             upsert=True,
         )
+        await self.locks.update_one(
+            {"_id": "scheduler"},
+            {"$setOnInsert": {"owner": None, "lease_until": datetime.min.replace(tzinfo=timezone.utc)}},
+            upsert=True,
+        )
 
     async def close(self) -> None:
         await self.client.close()
@@ -34,6 +40,35 @@ class MongoStore:
     async def health_check(self) -> bool:
         await self.client.admin.command("ping")
         return True
+
+    async def acquire_scheduler_lock(self, owner: str, lease_seconds: int = 45) -> bool:
+        now = datetime.now(timezone.utc)
+        lock = await self.locks.find_one_and_update(
+            {
+                "_id": "scheduler",
+                "$or": [
+                    {"lease_until": {"$lte": now}},
+                    {"owner": owner},
+                ],
+            },
+            {"$set": {"owner": owner, "lease_until": now + timedelta(seconds=lease_seconds)}},
+            return_document=ReturnDocument.AFTER,
+        )
+        return lock is not None
+
+    async def renew_scheduler_lock(self, owner: str, lease_seconds: int = 45) -> bool:
+        now = datetime.now(timezone.utc)
+        result = await self.locks.update_one(
+            {"_id": "scheduler", "owner": owner},
+            {"$set": {"lease_until": now + timedelta(seconds=lease_seconds)}},
+        )
+        return result.modified_count == 1
+
+    async def release_scheduler_lock(self, owner: str) -> None:
+        await self.locks.update_one(
+            {"_id": "scheduler", "owner": owner},
+            {"$set": {"owner": None, "lease_until": datetime.now(timezone.utc)}},
+        )
 
     async def save_user(self, user_id: int, name: str, batch: str) -> None:
         await self.users.update_one(
