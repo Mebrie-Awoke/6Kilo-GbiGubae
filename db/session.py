@@ -1,41 +1,49 @@
-# db/session.py
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from config import DATABASE_URL
+"""Async SQLAlchemy engine and session factory."""
 import logging
+
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+from config import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
-# ENGINE: Auto-reconnect + health check
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not configured. Set it in the deployment environment."
+    )
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,           # ← Checks if connection is alive
+    pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
     pool_timeout=30,
-    pool_recycle=3600,            # ← Reset connections every hour
+    pool_recycle=3600,
     connect_args={
         "timeout": 10,
-        "server_settings": {"jit": "off"}  # Optional: faster queries
-    }
+        "server_settings": {"jit": "off"},
+    },
 )
 
-# SESSION: Thread-safe, auto-reconnect
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autocommit=False,
-    autoflush=False
+    autoflush=False,
 )
 
-# Generator for dependency injection (FastAPI-style)
+
 async def get_db():
+    """Yield a database session and roll back failed transactions."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
-        except Exception as e:
-            logger.error(f"Database session error: {e}")
+        except Exception:
+            await session.rollback()
+            logger.exception("Database session error")
             raise
-        finally:
-            await session.close()
