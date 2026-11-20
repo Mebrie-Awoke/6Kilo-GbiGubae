@@ -60,7 +60,12 @@ async def cmd_add_admin(message: types.Message, state: FSMContext):
 # ──────────────────────────────────────────────────────────────
 @dp.message(AdminStates.entering_username_to_add)
 async def process_add_admin_username(message: types.Message, state: FSMContext):
-    username = message.text.strip().lstrip("@")
+    if message.from_user.id != SUPER_ADMIN_ID:
+        await state.clear()
+        await message.answer("You do not have permission.")
+        return
+
+    username = (message.text or "").strip().lstrip("@")
     
     if not username:
         await message.answer("Please enter a valid username.")
@@ -148,6 +153,10 @@ async def confirm_add_admin(callback: types.CallbackQuery):
 # --- Cancel promotion ---
 @dp.callback_query(F.data.startswith("cancel_add_admin:"))
 async def cancel_add_admin(callback: types.CallbackQuery):
+    if callback.from_user.id != SUPER_ADMIN_ID:
+        await callback.answer("You do not have permission.", show_alert=True)
+        return
+
     username = callback.data.split(":", 1)[1]
     await callback.message.edit_text(f"Admin promotion cancelled for @{username}.")
     await callback.answer()
@@ -264,7 +273,12 @@ async def cmd_remove_admin(message: types.Message, state: FSMContext):
 # ──────────────────────────────────────────────────────────────
 @dp.message(AdminStates.entering_username_to_remove)
 async def process_remove_admin_username(message: types.Message, state: FSMContext):
-    username = message.text.strip().lstrip("@")
+    if message.from_user.id != SUPER_ADMIN_ID:
+        await state.clear()
+        await message.answer("You do not have permission.")
+        return
+
+    username = (message.text or "").strip().lstrip("@")
     
     if not username:
         await message.answer("Please enter a valid username.")
@@ -350,6 +364,10 @@ async def confirm_remove_admin(callback: types.CallbackQuery):
 # --- Cancel removal ---
 @dp.callback_query(F.data.startswith("cancel_remove_admin:"))
 async def cancel_remove_admin(callback: types.CallbackQuery):
+    if callback.from_user.id != SUPER_ADMIN_ID:
+        await callback.answer("You do not have permission.", show_alert=True)
+        return
+
     username = callback.data.split(":", 1)[1]
     await callback.message.edit_text(f"Action cancelled. @{username} remains an admin.")
     await callback.answer()
