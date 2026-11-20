@@ -577,8 +577,8 @@ async def add_admin_command(message: Message, store: MongoStore, settings: Setti
         return
     if await store.add_admin(target_id, message.from_user.id):
         await message.answer(
-            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
-            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
+            f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\n"
+            f"Academic year: {escape(member['batch'])}\nTelegram ID: <code>{target_id}</code>"
         )
         await notify_new_admin(message.bot, target_id, member)
     else:
@@ -630,8 +630,8 @@ async def admin_add_selected(callback: CallbackQuery, store: MongoStore, setting
         return
     if await store.add_admin(target_id, callback.from_user.id):
         await callback.message.edit_text(
-            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
-            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
+            f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\n"
+            f"Academic year: {escape(member['batch'])}\nTelegram ID: <code>{target_id}</code>"
         )
         await notify_new_admin(callback.bot, target_id, member)
         await callback.answer("Administrator access granted and notification sent.")
@@ -689,8 +689,8 @@ async def show_admin_removal(message: Message, store: MongoStore, page: int = 0)
         return
     page = max(0, min(page, (len(admins) - 1) // 8))
     await message.answer(
-        "🗑 <b>Remove Administrator</b>\\n\\n"
-        "Select an administrator to revoke their access.\\n"
+        "🗑 <b>Remove Administrator</b>\n\n"
+        "Select an administrator to revoke their access.\n"
         f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(admins))} of {len(admins)} administrators.",
         reply_markup=admin_removal_keyboard(admins, page),
     )
@@ -699,14 +699,14 @@ async def show_admin_removal(message: Message, store: MongoStore, page: int = 0)
 async def notify_new_admin(bot, target_id: int, member: dict) -> None:
     """Send the newly promoted member a private onboarding message."""
     onboarding = (
-        f"🛡 <b>You are now an administrator of 6Kilo GbiGubae!</b>\\n\\n"
-        f"Hello {escape(member.get('name') or 'there')},\\n"
-        "Your administrator access is active. You can now:\\n"
-        "• View community and membership statistics\\n"
-        "• View registered members\\n"
-        "• Send announcements to all members or a specific academic year\\n"
-        "• Schedule and manage announcements\\n\\n"
-        "Open the bot and send /admin to access your administrator workspace.\\n"
+        f"🛡 <b>You are now an administrator of 6Kilo GbiGubae!</b>\n\n"
+        f"Hello {escape(member.get('name') or 'there')},\n"
+        "Your administrator access is active. You can now:\n"
+        "• View community and membership statistics\n"
+        "• View registered members\n"
+        "• Send announcements to all members or a specific academic year\n"
+        "• Schedule and manage announcements\n\n"
+        "Open the bot and send /admin to access your administrator workspace.\n"
         "Please use these permissions responsibly."
     )
     try:
@@ -753,8 +753,8 @@ async def admin_remove_page(callback: CallbackQuery, store: MongoStore, settings
     else:
         page = max(0, min(page, (len(admins) - 1) // 8))
         await callback.message.edit_text(
-            "🗑 <b>Remove Administrator</b>\\n\\n"
-            "Select an administrator to revoke their access.\\n"
+            "🗑 <b>Remove Administrator</b>\n\n"
+            "Select an administrator to revoke their access.\n"
             f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(admins))} of {len(admins)} administrators.",
             reply_markup=admin_removal_keyboard(admins, page),
         )
@@ -775,7 +775,7 @@ async def admin_remove_selected(callback: CallbackQuery, store: MongoStore, sett
     if await store.remove_admin(target_id, settings.super_admin_id):
         name = escape(member["name"]) if member else str(target_id)
         await callback.message.edit_text(
-            f"✅ <b>Administrator access removed</b>\\nName: {name}\\n"
+            f"✅ <b>Administrator access removed</b>\nName: {name}\n"
             f"Telegram ID: <code>{target_id}</code>"
         )
         await callback.answer("Administrator access revoked.")
