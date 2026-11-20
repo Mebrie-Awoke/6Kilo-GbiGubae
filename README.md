@@ -71,7 +71,9 @@ Only the Telegram account configured in SUPER_ADMIN_ID can use these commands.
 - /schedules — List pending schedules.
 - /cancel_schedule 3 — Cancel schedule number 3.
 
-Schedule dates are entered as `YYYY-MM-DD HH:MM` in the Ethiopian calendar (E.C.). For example, `2019-03-13 09:00` means 13 Hidar 2019 E.C. at 9:00 AM. The bot converts this to an absolute timestamp internally, so delivery remains accurate. Pending schedule lists and confirmations are displayed in Ethiopian calendar format.\n\nScheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
+Schedule dates are entered as `YYYY-MM-DD HH:MM` in the Ethiopian calendar (E.C.). For example, `2019-03-13 09:00` means 13 Hidar 2019 E.C. at 9:00 AM. The bot converts this to an absolute timestamp internally, so delivery remains accurate. Pending schedule lists and confirmations are displayed in Ethiopian calendar format.
+
+Scheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
 
 ## Deploy to Render
 
