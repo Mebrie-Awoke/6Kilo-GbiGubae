@@ -18,7 +18,7 @@ def calculate_next_run(
     if schedule_type == ScheduleType.CUSTOM:
         if not cron_expr:
             return None
-        return croniter.croniter(cron_expr, now).get_next(datetime)
+        return croniter(cron_expr, now).get_next(datetime)
 
     if schedule_type == ScheduleType.WEEKLY:
         candidate = scheduled_at + timedelta(weeks=1)
