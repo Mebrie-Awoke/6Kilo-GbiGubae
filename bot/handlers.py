@@ -227,7 +227,10 @@ async def list_schedules(message: Message, store: JsonStore, settings: Settings)
     lines = ["Pending schedules:"]
     for item in schedules[:30]:
         when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
-        lines.append(f"#{item['id']} | {when:%Y-%m-%d %H:%M} | {item['batch']} | {item['message'][:60]}")
+        lines.append(
+            f"#{item['id']} | {when:%Y-%m-%d %H:%M} | "
+            f"{escape(item['batch'])} | {escape(item['message'][:60])}"
+        )
     await message.answer("\n".join(lines))
 
 
