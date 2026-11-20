@@ -1,108 +1,110 @@
 # 6Kilo GbiGubae
 
-A Telegram community bot for member registration, administrator management, and scheduled text or media announcements.
+A lightweight Telegram bot for student registration, batch announcements and scheduled messages.
 
-## Architecture
+## Features
 
-- **Render web service:** receives Telegram updates through a verified webhook.
-- **PostgreSQL:** stores users, schedules, Telegram update inbox entries, conversation state, and per-recipient broadcast delivery status.
-- **GitHub Actions:** runs the scheduled-broadcast worker every five minutes, independently of Render uptime.
+- Register members with only their Telegram ID, name and batch.
+- View a profile and change a batch.
+- Send an immediate announcement to one batch or all registered members.
+- Schedule a text announcement for a batch or everyone.
+- List and cancel pending scheduled messages.
+- Protect administrator commands with a configured Telegram user ID.
+- Store data in one JSON file with atomic writes.
+- Resume pending scheduled deliveries after a process restart.
 
-The Render service can sleep on the free plan. The first webhook after inactivity may be delayed by a cold start, but the webhook update is persisted before Telegram receives an acknowledgement. Pending updates and broadcast deliveries can resume after a restart.
+## Project structure
 
-## Required configuration
+    .
+    ├── bot/
+    │   ├── config.py
+    │   ├── handlers.py
+    │   ├── scheduler.py
+    │   ├── states.py
+    │   └── storage.py
+    ├── tests/
+    ├── main.py
+    ├── requirements.txt
+    ├── render.yaml
+    └── README.md
 
-### Render environment variables
+## Local setup
 
-Set these in the Render service:
+Requires Python 3.11 or newer.
 
-- `BOT_TOKEN` — Telegram bot token
-- `SUPER_ADMIN_ID` — Telegram numeric ID of the super administrator
-- `DATABASE_URL` — PostgreSQL connection string
-- `WEBHOOK_SECRET` — random secret containing only letters, numbers, underscores, and hyphens
+    py -3.11 -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
 
-Render provides `RENDER_EXTERNAL_URL` automatically. If deploying elsewhere, set `WEBHOOK_BASE_URL` to the public HTTPS base URL.
+Create a .env file:
 
-### GitHub Actions secrets
+    BOT_TOKEN=your_telegram_bot_token
+    SUPER_ADMIN_ID=your_telegram_numeric_id
+    DATA_FILE=data/data.json
+    TIMEZONE=Africa/Addis_Ababa
+    BATCHES=1st Year,2nd Year,3rd Year,4th Year,5th Year,6th Year
 
-In GitHub, open **Settings → Secrets and variables → Actions** and add:
+Run:
 
-- `BOT_TOKEN`
-- `DATABASE_URL`
-- `SUPER_ADMIN_ID`
+    python main.py
 
-The scheduled worker uses these secrets to connect directly to PostgreSQL and Telegram. Use a publicly reachable PostgreSQL connection URL for the GitHub Actions secret (not a Render-only internal hostname); configure your database provider's network access rules if it restricts external connections. Do not commit tokens or database URLs to the repository.
+Without a public webhook URL, the bot uses Telegram long polling locally.
 
-Generate a webhook secret locally with:
+## Commands
 
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
+### Members
 
-Paste the generated value into Render's `WEBHOOK_SECRET` environment variable.
+- /start — Register or restart.
+- /profile — View your name and batch.
+- /edit_batch — Change your batch.
+- /help — Show available commands.
+
+### Administrator
+
+Only the Telegram account configured in SUPER_ADMIN_ID can use these commands.
+
+- /users — Count members by batch.
+- /broadcast 1st Year | Your message — Send now to one batch.
+- /broadcast all | Your message — Send now to everyone.
+- /schedule 2026-11-22 09:00 | 1st Year | Your message — Schedule in the configured local timezone.
+- /schedules — List pending schedules.
+- /cancel_schedule 3 — Cancel schedule number 3.
+
+Scheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
 
 ## Deploy to Render
 
-1. Back up the production PostgreSQL database.
-2. Add all required Render environment variables.
-3. From a trusted machine with the updated repository and production database URL configured, inspect the current Alembic revision and run `python -m alembic upgrade head` only after confirming that the existing database matches the repository's migration history.
-4. Confirm the migration completes successfully. Do not continue if the database has no matching Alembic history or reports schema conflicts; reconcile the database first.
-5. Manually deploy the Render service after the migration succeeds.
-6. Confirm `/health/ready` reports that PostgreSQL is connected and the Telegram webhook is configured successfully in the Render logs.
+This repository includes a Render Blueprint using a persistent disk.
 
-The Render blueprint has automatic deployment disabled so releases can be deliberate. Enable it only after you are comfortable with the migration and release process.
+1. Push the repository to GitHub.
+2. In Render, create a Blueprint deployment from this repository.
+3. Set BOT_TOKEN to the token from BotFather.
+4. Set SUPER_ADMIN_ID to the numeric Telegram ID of the administrator.
+5. Generate a webhook secret locally:
 
-## Scheduled broadcasts
+       py -c "import secrets; print(secrets.token_urlsafe(32))"
 
-The GitHub Actions workflow at `.github/workflows/scheduled-broadcasts.yml` runs every five minutes and can also be started manually from the Actions tab.
+6. Set the generated value as WEBHOOK_SECRET.
+7. Deploy and wait for the health check to pass.
 
-It creates a durable run for each due schedule and stores one delivery record per recipient. Pending and stale in-progress deliveries are retried on later runs. A broadcast may therefore continue after Render sleeps or restarts.
+The Blueprint mounts a persistent disk at /var/data and stores the JSON file at /var/data/data.json. Keep one running instance only: JSON storage is designed for a single process and must not be shared by multiple bot instances.
 
-GitHub-hosted scheduled workflows are not an exact-time guarantee; they can start later than the cron time. Telegram also does not provide an idempotency key for message sends, so a rare duplicate remains possible if the worker crashes after Telegram accepts a message but before PostgreSQL records it as sent.
+A persistent disk and an always-running Render service are required for reliable scheduled delivery. If the service is stopped or unavailable at the scheduled time, the message will be sent when the service starts again. This can delay delivery; it cannot guarantee an exact send time while the service is offline.
 
-## Local development
+## Vercel
 
-Requirements: Python 3.11+ and PostgreSQL.
+Vercel is not a supported deployment target for this version. Its serverless execution and temporary filesystem are not appropriate for a bot that needs a continuously running scheduler and a persistent local JSON file. Use Render for this architecture.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-```
+## Data and reliability
 
-Create a `.env` file with the Render environment variables, plus `WEBHOOK_BASE_URL` pointing to a public HTTPS tunnel for local webhook testing.
-
-Apply migrations and start the application:
-
-```powershell
-python -m alembic upgrade head
-python main.py
-```
-
-Run the scheduled worker manually:
-
-```powershell
-python -m services.run_scheduled_jobs
-```
-
-## Health checks
-
-- `/` — process liveness
-- `/health/ready` — PostgreSQL readiness
-- `/telegram/webhook` — Telegram webhook receiver (POST only)
+- User records contain only Telegram ID (as the JSON object key), name and batch.
+- Schedules contain the target batch, message, send time, creator ID and delivery progress.
+- No PostgreSQL, SQLAlchemy, Alembic, migrations or external database are used.
+- Writes use a temporary file followed by an atomic replace.
+- If the JSON file is invalid, the bot stops rather than overwriting it. Restore a valid backup.
+- Telegram does not provide an idempotency key for message sending. If the process stops after Telegram accepts a message but before its delivery is saved, that recipient may receive the message twice after restart.
+- Back up /var/data/data.json periodically. A persistent disk is not a backup.
 
 ## Tests
 
-```powershell
-python -m unittest discover -s tests -v
-```
-
-GitHub Actions runs syntax checks and unit tests on pushes and pull requests to `main`.
-
-## Database safety
-
-Use Alembic migrations to evolve the schema. The `_init_db.py` helper applies migrations and does not drop existing tables. Back up the production database before applying schema changes.
-
-## License
-
-No license has been declared in this repository. Confirm the upstream project's license before redistribution.
+    python -m unittest discover -s tests -v

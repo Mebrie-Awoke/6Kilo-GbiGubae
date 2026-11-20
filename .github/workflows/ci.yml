@@ -10,10 +10,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install dependencies
@@ -21,14 +19,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
       - name: Compile Python files
-        run: python -m compileall -q .
-      - name: Validate Alembic migration graph
-        run: python -m alembic heads
+        run: python -m compileall -q bot main.py tests
       - name: Run unit tests
-        env:
-          BOT_TOKEN: "123456:TEST_TOKEN"
-          SUPER_ADMIN_ID: "1"
-          DATABASE_URL: "postgresql://user:pass@localhost/test_db"
-          WEBHOOK_SECRET: "ci-secret"
-          RENDER_EXTERNAL_URL: "https://example.onrender.com"
         run: python -m unittest discover -s tests -v

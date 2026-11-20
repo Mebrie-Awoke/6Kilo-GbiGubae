@@ -1,22 +1,28 @@
 services:
   - type: web
-    name: gibi-scheduler-bot
+    name: 6kilo-gbigubae-bot
     env: python
+    plan: starter
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt
     startCommand: python main.py
-    plan: free
-    autoDeploy: false
+    autoDeploy: true
     healthCheckPath: /health/ready
+    disk:
+      name: 6kilo-bot-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
-      - key: PORT
-        value: 8080
       - key: BOT_TOKEN
-        sync: false
-      - key: DATABASE_URL
         sync: false
       - key: SUPER_ADMIN_ID
         sync: false
       - key: WEBHOOK_SECRET
         sync: false
+      - key: DATA_FILE
+        value: /var/data/data.json
+      - key: TIMEZONE
+        value: Africa/Addis_Ababa
+      - key: BATCHES
+        value: 1st Year,2nd Year,3rd Year,4th Year,5th Year,6th Year
