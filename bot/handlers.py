@@ -123,7 +123,7 @@ async def show_admin_home(message: Message, state: FSMContext, store: MongoStore
 async def show_member_home(message: Message, user: dict, state: FSMContext, settings: Settings) -> None:
     await state.clear()
     await message.answer(
-        ff"👋 <b>Welcome back, {escape(user['name'])}!</b>\n\n"
+        f"👋 <b>Welcome back, {escape(user['name'])}!</b>\n\n"
         f"🎓 Academic year: <b>{escape(user['batch'])}</b>\n"
         f"📅 Ethiopian date: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
         "Your membership profile is active.",
@@ -184,8 +184,8 @@ async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: S
     for user in users:
         if user.get("batch") in counts:
             counts[user["batch"]] += 1
-    lines = ["📊 <b>የማኅበረሰቡ አጠቃላይ ሁኔታ</b>", "━━━━━━━━━━━━━━━━━━",
-             f"ጠቅላላ አባላት: <b>{len(users)}</b>", ""]
+    lines = ["📊 <b>Community Overview</b>", "━━━━━━━━━━━━━━━━━━",
+             f"Total registered members: <b>{len(users)}</b>", ""]
     lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
     await callback.message.edit_text("\n".join(lines), reply_markup=admin_menu())
     await callback.answer()
@@ -201,10 +201,10 @@ async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Se
     for user in users:
         if user.get("batch") in counts:
             counts[user["batch"]] += 1
-    lines = ["👥 <b>የአባላት ማጠቃለያ</b>", "━━━━━━━━━━━━━━━━━━",
-             f"የተመዘገቡ: <b>{len(users)}</b>"]
+    lines = ["👥 <b>Member Summary</b>", "━━━━━━━━━━━━━━━━━━",
+             f"Registered members: <b>{len(users)}</b>"]
     lines.extend(f"• {escape(display_batch(batch))} — {count}" for batch, count in counts.items())
-    lines.append("\nዝርዝር ቁጥር ለማየት /users ይጠቀሙ።")
+    lines.append("\nUse /users to view the member breakdown.")
     await callback.message.edit_text("\n".join(lines), reply_markup=admin_menu())
     await callback.answer()
 
@@ -216,9 +216,9 @@ async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: 
         return
     schedules = await store.list_schedules()
     if not schedules:
-        text = "🗓 <b>የታቀዱ ማስታወቂያዎች</b>\n\nለመላክ የሚጠብቅ ማስታወቂያ የለም።"
+        text = "🗓 <b>Scheduled Announcements</b>\n\nThere are no pending announcements."
     else:
-        lines = ["🗓 <b>ለመላክ የሚጠብቁ ማስታወቂያዎች</b>", "━━━━━━━━━━━━━━━━━━"]
+        lines = ["🗓 <b>Pending Announcements</b>", "━━━━━━━━━━━━━━━━━━"]
         for item in schedules[:15]:
             when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
             lines.append(
@@ -236,11 +236,11 @@ async def admin_help(callback: CallbackQuery, settings: Settings):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
     text = (
-        "❔ <b>የአስተዳዳሪ መመሪያ</b>\n\n"
-        "• አጠቃላይ እይታ — የአባላትና የዓመት ስታቲስቲክስ\n"
-        "• አባላት — በየዓመቱ ያሉ አባላት ብዛት\n"
-        "• አዲስ ማስታወቂያ — በደረጃ የሚመራ ማዘጋጃ\n"
-        "• የታቀዱ መልዕክቶች — የመላኪያ መርሐግብር ይመልከቱ\n\n"
+        "❔ <b>Administrator Guide</b>\n\n"
+        "• Overview — membership and academic-year statistics\n"
+        "• Members — registered members by academic year\n"
+        "• New Announcement — guided announcement workflow\n"
+        "• Scheduled Messages — review pending deliveries\n\n"
         "Commands: /admin, /users, /broadcast, /schedule, "
         "/schedules, /cancel_schedule ID, /menu"
     )
@@ -255,8 +255,8 @@ async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: 
         return
     await state.set_state(AdminBroadcast.choosing_target)
     await callback.message.edit_text(
-        "📣 <b>አዲስ ማስታወቂያ</b>\n\n"
-        "ደረጃ 1/2 — መልዕክቱ የሚደርሰውን ቡድን ይምረጡ።",
+        "📣 <b>New Announcement</b>\n\n"
+        "Step 1 of 2 — Choose the audience for this announcement.",
         reply_markup=target_keyboard(settings),
     )
     await callback.answer()
@@ -268,7 +268,7 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.choosing_target.state:
-        await callback.answer("የማስታወቂያ ሂደቱ ጊዜ አልፎበታል። እባክዎ እንደገና ይጀምሩ።", show_alert=True)
+        await callback.answer("This announcement session has expired. Please start again.", show_alert=True)
         return
     selected = callback.data.rsplit(":", 1)[1]
     if selected == "all":
@@ -285,8 +285,8 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
     await state.set_state(AdminBroadcast.entering_message)
     await callback.message.edit_text(
         f"📣 <b>አዲስ ማስታወቂያ</b>\nተቀባዮች: <b>{escape(label)}</b>\n\n"
-        "ደረጃ 2/2 — የማስታወቂያውን ጽሑፍ በሚቀጥለው መልዕክት ይላኩ።\n"
-        "እስከ 4,096 ፊደላት መላክ ይችላሉ። ለማቋረጥ /cancel ይጠቀሙ።"
+        "Step 2 of 2 — Send the announcement text in your next message.\n"
+        "You can send up to 4,096 characters. Use /cancel to stop."
     )
     await callback.answer()
 
@@ -295,17 +295,17 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
 async def compose_broadcast(message: Message, state: FSMContext):
     text = (message.text or "").strip()
     if not text or len(text) > 4096:
-        await message.answer("እባክዎ ከ1 እስከ 4,096 ፊደላት ያሉትን መልዕክት ይላኩ።")
+        await message.answer("Please send announcement text containing 1–4,096 characters.")
         return
     data = await state.get_data()
     await state.update_data(message=text)
     await state.set_state(AdminBroadcast.confirming)
     await message.answer(
-        "🔎 <b>ማስታወቂያውን ይገምግሙ</b>\n"
+        "🔎 <b>Review Announcement</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"ተቀባዮች: <b>{escape(data.get('target_label', 'ያልታወቀ'))}</b>\n\n"
+        f"Audience: <b>{escape(data.get('target_label', 'Unknown'))}</b>\n\n"
         f"{escape(text)}\n\n"
-        "ይህን ማስታወቂያ አሁን መላክ ይፈልጋሉ?",
+        "Are you ready to send this announcement?",
         reply_markup=confirmation_keyboard(),
     )
 
@@ -341,12 +341,12 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: M
     sent, failed, total = await send_to_target(callback.message, store, target, text, settings)
     await state.clear()
     await callback.message.edit_text(
-        "📬 <b>የመላኪያ ሪፖርት</b>\n"
+        "📬 <b>Delivery Report</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"ተቀባዮች: <b>{escape(data.get('target_label', target))}</b>\n"
-        f"ተቀባዮች: <b>{total}</b>\n"
-        f"የደረሳቸው: <b>{sent}</b>\n"
-        f"ያልደረሳቸው: <b>{failed}</b>",
+        f"Audience: <b>{escape(data.get('target_label', target))}</b>\n"
+        f"Recipients: <b>{total}</b>\n"
+        f"Delivered: <b>{sent}</b>\n"
+        f"Failed: <b>{failed}</b>",
         reply_markup=admin_menu(),
     )
     await callback.answer("የማስታወቂያ ሂደቱ ተጠናቋል።")
@@ -374,7 +374,7 @@ async def member_profile(callback: CallbackQuery, store: MongoStore):
         return
     await callback.message.answer(
         f"👤 <b>የእርስዎ የአባልነት መረጃ</b>\n\n"
-        f"ስም: {escape(user['name'])}\nየትምህርት ዓመት: {escape(user['batch'])}"
+        f"Name: {escape(user['name'])}\nAcademic year: {escape(user['batch'])}"
     )
     await callback.answer()
 
@@ -394,12 +394,12 @@ async def member_change_batch(callback: CallbackQuery, state: FSMContext, store:
 @router.callback_query(F.data == "member:help")
 async def member_help(callback: CallbackQuery):
     await callback.message.answer(
-        "ℹ️ <b>የአጠቃቀም እገዛ</b>\n\n"
-        "/start — ዋና ገጽዎን ይክፈቱ\n"
-        "/profile — የአባልነት መረጃዎን ይመልከቱ\n"
-        "/edit_batch — የትምህርት ዓመትዎን ይቀይሩ\n"
-        "/menu — ዋና ምናሌውን ያሳዩ\n"
-        "/cancel — አሁን ያለውን ሂደት ያቋርጡ"
+        "ℹ️ <b>Member Help</b>\n\n"
+        "/start — Open your membership home\n"
+        "/profile — View your membership profile\n"
+        "/edit_batch — Change your academic year\n"
+        "/menu — Show the main menu\n"
+        "/cancel — Cancel the current action"
     )
     await callback.answer()
 
@@ -429,13 +429,13 @@ async def collect_batch(message: Message, state: FSMContext, store: MongoStore, 
     name = data.get("name")
     if not name:
         await state.clear()
-        await message.answer("የምዝገባ ሂደቱ ጊዜ አልፎበታል። እባክዎ /start በመጠቀም እንደገና ይጀምሩ።")
+        await message.answer("Your registration session expired. Please start again with /start.")
         return
     await store.save_user(message.from_user.id, name, batch)
     await state.clear()
     await message.answer(
-        "✅ <b>ምዝገባዎ ተጠናቋል</b>\n\n"
-        f"ስም: <b>{escape(name)}</b>\nየትምህርት ዓመት: <b>{escape(batch)}</b>\n\n"
+        "✅ <b>Registration Complete</b>\n\n"
+        f"Name: <b>{escape(name)}</b>\nAcademic year: <b>{escape(batch)}</b>\n\n"
         "You will now receive announcements intended for your academic year.",
         reply_markup=ReplyKeyboardRemove(),
     )
@@ -447,7 +447,7 @@ async def collect_batch(message: Message, state: FSMContext, store: MongoStore, 
 async def profile(message: Message, store: MongoStore):
     user = await store.get_user(message.from_user.id)
     if not user:
-        await message.answer("ገና አልተመዘገቡም። /start ይጠቀሙ።")
+        await message.answer("You are not registered yet. Use /start to register.")
         return
     await message.answer(f"👤 <b>{escape(user['name'])}</b>\n🎓 {escape(display_batch(user['batch']))}")
 
@@ -476,23 +476,23 @@ async def cancel(message: Message, state: FSMContext, settings: Settings, store:
 async def help_command(message: Message, settings: Settings):
     if admin_only(settings, message):
         await message.answer(
-            "🛡 <b>የአስተዳዳሪ ትዕዛዞች</b>\n\n"
-            "/admin — የአስተዳዳሪ ማዕከልን ይክፈቱ\n"
-            "/users — የአባላት ቁጥር ሪፖርት\n"
-            "/broadcast — ማስታወቂያ ለመላክ\n"
+            "🛡 <b>Administrator Commands</b>\n\n"
+            "/admin — Open the admin workspace\n"
+            "/users — View membership statistics\n"
+            "/broadcast — Send an announcement\n"
             "/schedule YYYY-MM-DD HH:MM | batch | message — Schedule using Ethiopian date (E.C.)\n"
-            "/schedules — የታቀዱ መልዕክቶችን ለማየት\n"
-            "/cancel_schedule ID — መርሐግብር ለመሰረዝ\n"
-            "/menu — ማዕከሉን ይክፈቱ"
+            "/schedules — View scheduled messages\n"
+            "/cancel_schedule ID — Cancel a scheduled message\n"
+            "/menu — Open the admin workspace"
         )
     else:
         await message.answer(
             "ℹ️ <b>Member commands</b>\n\n"
-            "/start — ዋና ገጽዎን ይክፈቱ\n"
-            "/profile — የአባልነት መረጃዎን ይመልከቱ\n"
-            "/edit_batch — የትምህርት ዓመትዎን ይቀይሩ\n"
-            "/menu — ዋና ምናሌውን ያሳዩ\n"
-            "/cancel — አሁን ያለውን ሂደት ያቋርጡ"
+            "/start — Open your membership home\n"
+            "/profile — View your membership profile\n"
+            "/edit_batch — Change your academic year\n"
+            "/menu — Show the main menu\n"
+            "/cancel — Cancel the current action"
         )
 
 
@@ -543,8 +543,8 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
         return
     await state.set_state(AdminBroadcast.choosing_target)
     await message.answer(
-        "📣 <b>የማስታወቂያ ማዘጋጃ</b>\n\n"
-        "ደረጃ 1/2 — ማስታወቂያውን የሚቀበሉትን ይምረጡ።",
+        "📣 <b>Announcement Composer</b>\n\n"
+        "Step 1 of 2 — Choose who should receive this announcement.",
         reply_markup=target_keyboard(settings),
     )
 
@@ -557,32 +557,32 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
     parts = [part.strip() for part in command_payload(message).split("|", 2)]
     if len(parts) != 3:
         await message.answer(
-            "🗓 <b>ማስታወቂያ የሚላክበትን ጊዜ ያቅዱ</b>\n\n"
-            "አጻጻፍ: /schedule YYYY-MM-DD HH:MM | batch | message (በኢትዮጵያ ዘመን)\n"
-            "ለሁሉም አባላት ለመላክ 'all' ይጠቀሙ።\n"
+            "🗓 <b>Schedule an Announcement</b>\n\n"
+            "Format: /schedule YYYY-MM-DD HH:MM | batch | message (Ethiopian calendar)\n"
+            "Use 'all' to target every registered member.\n"
             "Example: /schedule 2019-03-13 09:00 | 1st Year | Class starts at 9 AM\n"
             "ወራት: መስከረም፣ ጥቅምት፣ ኅዳር፣ ታኅሣሥ፣ ጥር፣ የካቲት፣ መጋቢት፣ ሚያዝያ፣ ግንቦት፣ ሰኔ፣ ሐምሌ፣ ነሐሴ፣ ጳጉሜ።"
         )
         return
     time_text, target, text = parts
     if not valid_target(target, settings) or not text or len(text) > 4096:
-        await message.answer("የተመረጠው ተቀባይ ወይም መልዕክት ትክክል አይደለም። መልዕክቱ ከ1 እስከ 4,096 ፊደላት መሆን አለበት።")
+        await message.answer("Invalid audience or message. The message must contain 1–4,096 characters.")
         return
     try:
         scheduled_at = parse_ethiopian_datetime(time_text, ZoneInfo(settings.timezone))
     except (ValueError, ZoneInfoNotFoundError):
-        await message.answer("የኢትዮጵያ ቀን/ሰዓት ወይም የሰዓት ክልሉ ትክክል አይደለም። YYYY-MM-DD HH:MM (ዓ.ም.) ቅርጸት ይጠቀሙ።")
+        await message.answer("Invalid Ethiopian date or time. Use YYYY-MM-DD HH:MM (E.C.).")
         return
     if scheduled_at <= datetime.now(scheduled_at.tzinfo):
-        await message.answer("የታቀደው ጊዜ ከአሁኑ በኋላ መሆን አለበት።")
+        await message.answer("The scheduled time must be in the future.")
         return
     item = await store.create_schedule(
         batch=target, message=text, send_at=scheduled_at, created_by=message.from_user.id
     )
     await message.answer(
-        "✅ <b>ማስታወቂያው በመርሐግብር ተይዟል</b>\n\n"
-        f"መለያ ቁጥር: <b>#{item['id']}</b>\nተቀባዮች: <b>{escape(display_batch(target))}</b>\n"
-        f"የሚላክበት ጊዜ: <b>{format_ethiopian(scheduled_at, ZoneInfo(settings.timezone))}</b>"
+        "✅ <b>Announcement Scheduled</b>\n\n"
+        f"Schedule ID: <b>#{item['id']}</b>\nAudience: <b>{escape(display_batch(target))}</b>\n"
+        f"Scheduled for: <b>{format_ethiopian(scheduled_at, ZoneInfo(settings.timezone))}</b>"
     )
 
 
@@ -593,9 +593,9 @@ async def list_schedules(message: Message, store: MongoStore, settings: Settings
         return
     schedules = await store.list_schedules()
     if not schedules:
-        await message.answer("🗓 <b>የታቀዱ ማስታወቂያዎች</b>\n\nለመላክ የሚጠብቅ ማስታወቂያ የለም።")
+        await message.answer("🗓 <b>Scheduled Announcements</b>\n\nThere are no pending announcements.")
         return
-    lines = ["🗓 <b>ለመላክ የሚጠብቁ ማስታወቂያዎች</b>", "━━━━━━━━━━━━━━━━━━"]
+    lines = ["🗓 <b>Pending Announcements</b>", "━━━━━━━━━━━━━━━━━━"]
     for item in schedules[:30]:
         when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
         lines.append(
@@ -613,9 +613,9 @@ async def cancel_schedule(message: Message, store: MongoStore, settings: Setting
     try:
         schedule_id = int(command_payload(message))
     except ValueError:
-        await message.answer("አጠቃቀም: /cancel_schedule ID")
+        await message.answer("Usage: /cancel_schedule ID")
         return
     if await store.cancel_schedule(schedule_id):
-        await message.answer(f"✅ በቁጥር #{schedule_id} ተሰርዟል።")
+        await message.answer(f"✅ Schedule #{schedule_id} has been cancelled.")
     else:
-        await message.answer("በዚህ መለያ ቁጥር የተያዘ ማስታወቂያ አልተገኘም።")
+        await message.answer("No pending announcement was found with that ID.")
