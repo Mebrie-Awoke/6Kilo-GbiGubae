@@ -1,53 +1,63 @@
-# tg_notify_bot
+# 6Kilo GbiGubae
 
-Small Telegram scheduler/notification bot using aiogram.
+A Telegram bot for community registration, administrator management, and scheduled text or media announcements.
 
 ## Requirements
-- Python 3.11+ (use a virtual environment)
-- This project lists Python package dependencies in `requirements.txt`.
 
-## Quick setup
+- Python 3.11+
+- PostgreSQL
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
 
-1. Create & activate a virtual environment (PowerShell):
+## Configuration
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate
+Create a `.env` file in the project root:
+
+```env
+TG_BOT_TOKEN=your_telegram_bot_token
+SUPER_ADMIN_ID=your_telegram_user_id
+DATABASE_URL=postgresql://user:password@host:5432/database
 ```
 
-2. Install dependencies:
+The application converts PostgreSQL URLs to the asyncpg driver automatically. Keep the `.env` file private and never commit credentials.
+
+## Run locally
 
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-```
-
-3. Create a `.env` file (if required) and add your Telegram bot token and any other secrets. Example:
-
-```
-TG_BOT_TOKEN=your_token_here
-DATABASE_URL=postgresql://user:pass@localhost/dbname
-```
-
-4. Run the bot (example):
-
-```powershell
+python -m alembic upgrade head
 python main.py
 ```
 
-## VS Code / Pylance notes
+For Linux/macOS, activate the virtual environment with `source .venv/bin/activate`.
 
-- This project includes a workspace setting that points VS Code to the project's venv: `.vscode/settings.json` -> `python.defaultInterpreterPath`.
-- If Pylance reports "Import 'aiogram' could not be resolved":
-  - Ensure the venv is activated and `aiogram` is installed in it (`pip show aiogram`).
-  - In VS Code, run `Python: Select Interpreter` and choose the project's venv interpreter at `./venv/Scripts/python.exe`.
-  - Reload the window (Developer: Reload Window) to force Pylance to re-index.
+## Deployment
 
-## Common issues
-- `Package 'python' is not installed` when reading `requirements.txt`: don't include `python==...` in `requirements.txt`. Use `pyproject.toml`, `runtime.txt`, or document the Python version in this README.
-- If you accidentally committed secrets, rotate them immediately and remove them from the repository history.
+The repository includes a Render blueprint in `render.yaml`. Configure `TG_BOT_TOKEN` (or `BOT_TOKEN`), `SUPER_ADMIN_ID`, and `DATABASE_URL` as Render environment variables. Run database migrations with:
 
-## Contributing
-- Open an issue or PR if you have improvements or feature requests.
+```bash
+python -m alembic upgrade head
+```
+
+Health endpoints:
+
+- `/` — process liveness
+- `/health/ready` — PostgreSQL readiness
+- `/ping` — simple ping
+
+## Tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+GitHub Actions runs Python compilation checks and the unit test suite on pushes and pull requests to `main`.
+
+## Database safety
+
+Use Alembic migrations to evolve the schema. The `_init_db.py` helper now applies migrations and no longer drops existing tables. Do not manually run destructive SQL against a production database.
 
 ## License
-- (Add your license here)
+
+No license has been declared yet. Confirm the upstream project's license before redistributing or publishing modified copies.
