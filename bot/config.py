@@ -11,7 +11,8 @@ load_dotenv()
 class Settings:
     bot_token: str
     super_admin_id: int
-    data_file: str
+    mongodb_uri: str
+    mongodb_database: str
     timezone: str
     batches: tuple[str, ...]
     webhook_secret: str | None
@@ -31,6 +32,10 @@ def load_settings() -> Settings:
     if admin_id <= 0:
         raise RuntimeError("SUPER_ADMIN_ID must be a positive Telegram user ID.")
 
+    mongodb_uri = os.getenv("MONGODB_URI", "").strip()
+    if not mongodb_uri:
+        raise RuntimeError("MONGODB_URI is required. Add your MongoDB Atlas connection string.")
+
     batches = tuple(
         item.strip()
         for item in os.getenv(
@@ -42,7 +47,11 @@ def load_settings() -> Settings:
     if not batches:
         raise RuntimeError("Configure at least one batch in BATCHES.")
 
-    base_url = (os.getenv("WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+    base_url = (
+        os.getenv("WEBHOOK_BASE_URL")
+        or os.getenv("RENDER_EXTERNAL_URL")
+        or ""
+    ).rstrip("/")
     secret = os.getenv("WEBHOOK_SECRET") or None
     if base_url and not secret:
         raise RuntimeError("WEBHOOK_SECRET is required when webhook mode is enabled.")
@@ -55,7 +64,8 @@ def load_settings() -> Settings:
     return Settings(
         bot_token=token,
         super_admin_id=admin_id,
-        data_file=os.getenv("DATA_FILE", "data/data.json"),
+        mongodb_uri=mongodb_uri,
+        mongodb_database=os.getenv("MONGODB_DATABASE", "gbigubae_bot").strip(),
         timezone=os.getenv("TIMEZONE", "Africa/Addis_Ababa"),
         batches=batches,
         webhook_secret=secret,

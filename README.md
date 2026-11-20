@@ -1,113 +1,56 @@
 # 6Kilo GbiGubae
 
-A lightweight Telegram bot for student registration, batch announcements and scheduled messages.
+Amharic-first Telegram community bot with a FastAPI service and MongoDB Atlas storage.
 
 ## Features
 
-- Register members with only their Telegram ID, name and batch.
-- View a profile and change a batch.
-- Send an immediate announcement to one batch or all registered members.
-- Schedule a text announcement using Ethiopian calendar dates for a batch or everyone.
-- Display the current date and scheduled delivery dates in Ethiopian calendar format.
-- List and cancel pending scheduled messages.
-- Protect administrator commands with a configured Telegram user ID.
-- Store data in one JSON file with atomic writes.
-- Resume pending scheduled deliveries after a process restart.
-
-## Project structure
-
-    .
-    ├── bot/
-    │   ├── config.py
-    │   ├── handlers.py
-    │   ├── scheduler.py
-    │   ├── states.py
-    │   └── storage.py
-    ├── tests/
-    ├── main.py
-    ├── requirements.txt
-    ├── render.yaml
-    └── README.md
+- Member registration, profiles and batch updates.
+- Guided announcements for all members or a selected batch.
+- Scheduled announcements using Ethiopian calendar dates.
+- Admin dashboard, member summaries and schedule management.
+- MongoDB collections and indexes initialized automatically.
 
 ## Local setup
 
-Requires Python 3.11 or newer.
+Python 3.11+
 
-    py -3.11 -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    pip install -r requirements.txt
+```bash
+py -3.11 -m venv .venv
+.venv\\Scripts\\activate
+pip install -r requirements.txt
+```
 
-Create a .env file:
+Create a `.env` file:
 
-    BOT_TOKEN=your_telegram_bot_token
-    SUPER_ADMIN_ID=your_telegram_numeric_id
-    DATA_FILE=data/data.json
-    TIMEZONE=Africa/Addis_Ababa
-    BATCHES=1st Year,2nd Year,3rd Year,4th Year,5th Year,6th Year
+```env
+BOT_TOKEN=your_bot_token
+SUPER_ADMIN_ID=your_telegram_user_id
+MONGODB_URI=your_mongodb_atlas_connection_string
+MONGODB_DATABASE=gbigubae_bot
+TIMEZONE=Africa/Addis_Ababa
+```
 
 Run:
 
-    python main.py
+```bash
+python main.py
+```
 
-Without a public webhook URL, the bot uses Telegram long polling locally.
+The API runs on port 8080 by default. Without a public webhook URL, the bot uses Telegram polling locally. On Render, set `WEBHOOK_SECRET`; Render's public URL is detected automatically.
 
-## Commands
+## API
 
-### Members
+- `GET /` — service health.
+- `GET /health/ready` — MongoDB readiness.
+- `POST /telegram/webhook` — Telegram updates.
+- `GET /docs` — interactive API documentation.
 
-- /start — Register or restart.
-- /profile — View your name and batch.
-- /edit_batch — Change your batch.
-- /help — Show available commands.
+## MongoDB
 
-### Administrator
-
-Only the Telegram account configured in SUPER_ADMIN_ID can use these commands.
-
-- /users — Count members by batch.
-- /broadcast 1st Year | Your message — Send now to one batch.
-- /broadcast all | Your message — Send now to everyone.
-- /schedule 2019-03-13 09:00 | 1st Year | Your message — Schedule using Ethiopian date/time (E.C.) in the configured local timezone.
-- /schedules — List pending schedules.
-- /cancel_schedule 3 — Cancel schedule number 3.
-
-Schedule dates are entered as `YYYY-MM-DD HH:MM` in the Ethiopian calendar (E.C.). For example, `2019-03-13 09:00` means 13 Hidar 2019 E.C. at 9:00 AM. The bot converts this to an absolute timestamp internally, so delivery remains accurate. Pending schedule lists and confirmations are displayed in Ethiopian calendar format.
-
-Scheduled messages are text-only in this simplified version. Recurring schedules, media announcements, multiple administrators and advanced calendar editing were removed to keep the application small and easier to maintain.
-
-## Deploy to Render
-
-This repository includes a Render Blueprint using a persistent disk.
-
-1. Push the repository to GitHub.
-2. In Render, create a Blueprint deployment from this repository.
-3. Set BOT_TOKEN to the token from BotFather.
-4. Set SUPER_ADMIN_ID to the numeric Telegram ID of the administrator.
-5. Generate a webhook secret locally:
-
-       py -c "import secrets; print(secrets.token_urlsafe(32))"
-
-6. Set the generated value as WEBHOOK_SECRET.
-7. Deploy and wait for the health check to pass.
-
-The Blueprint mounts a persistent disk at /var/data and stores the JSON file at /var/data/data.json. Keep one running instance only: JSON storage is designed for a single process and must not be shared by multiple bot instances.
-
-A persistent disk and an always-running Render service are required for reliable scheduled delivery. If the service is stopped or unavailable at the scheduled time, the message will be sent when the service starts again. This can delay delivery; it cannot guarantee an exact send time while the service is offline.
-
-## Vercel
-
-Vercel is not a supported deployment target for this version. Its serverless execution and temporary filesystem are not appropriate for a bot that needs a continuously running scheduler and a persistent local JSON file. Use Render for this architecture.
-
-## Data and reliability
-
-- User records contain only Telegram ID (as the JSON object key), name and batch.
-- Schedules contain the target batch, message, send time, creator ID and delivery progress.
-- No PostgreSQL, SQLAlchemy, Alembic, migrations or external database are used.
-- Writes use a temporary file followed by an atomic replace.
-- If the JSON file is invalid, the bot stops rather than overwriting it. Restore a valid backup.
-- Telegram does not provide an idempotency key for message sending. If the process stops after Telegram accepts a message but before its delivery is saved, that recipient may receive the message twice after restart.
-- Back up /var/data/data.json periodically. A persistent disk is not a backup.
+At startup, the application connects to the configured database and creates the `users`, `schedules`, and `counters` collections and required indexes automatically. No manual database or collection creation is needed.
 
 ## Tests
 
-    python -m unittest discover -s tests -v
+```bash
+python -m unittest discover -s tests -v
+```

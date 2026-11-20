@@ -21,7 +21,7 @@ from aiogram.types import (
 from bot.config import Settings
 from bot.ethiopian_calendar import format_ethiopian, parse_ethiopian_datetime
 from bot.states import AdminBroadcast, Registration
-from bot.storage import JsonStore
+from bot.storage import MongoStore
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -93,7 +93,7 @@ def confirmation_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-async def show_admin_home(message: Message, state: FSMContext, store: JsonStore, settings: Settings) -> None:
+async def show_admin_home(message: Message, state: FSMContext, store: MongoStore, settings: Settings) -> None:
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await message.answer(
@@ -128,7 +128,7 @@ async def start_registration(message: Message, state: FSMContext) -> None:
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
+async def start(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     user_id = message.from_user.id
     if is_admin(settings, user_id):
         await show_admin_home(message, state, store, settings)
@@ -141,7 +141,7 @@ async def start(message: Message, state: FSMContext, store: JsonStore, settings:
 
 
 @router.message(Command("admin"))
-async def admin_home(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
+async def admin_home(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ ይህ የሥራ ቦታ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
@@ -149,7 +149,7 @@ async def admin_home(message: Message, state: FSMContext, store: JsonStore, sett
 
 
 @router.message(Command("menu"))
-async def menu_command(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
+async def menu_command(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     if admin_only(settings, message):
         await show_admin_home(message, state, store, settings)
         return
@@ -161,7 +161,7 @@ async def menu_command(message: Message, state: FSMContext, store: JsonStore, se
 
 
 @router.callback_query(F.data == "admin:overview")
-async def admin_overview(callback: CallbackQuery, store: JsonStore, settings: Settings):
+async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
@@ -178,7 +178,7 @@ async def admin_overview(callback: CallbackQuery, store: JsonStore, settings: Se
 
 
 @router.callback_query(F.data == "admin:members")
-async def admin_members(callback: CallbackQuery, store: JsonStore, settings: Settings):
+async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
@@ -196,7 +196,7 @@ async def admin_members(callback: CallbackQuery, store: JsonStore, settings: Set
 
 
 @router.callback_query(F.data == "admin:schedules")
-async def admin_schedules(callback: CallbackQuery, store: JsonStore, settings: Settings):
+async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
@@ -310,7 +310,7 @@ async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: S
 
 
 @router.callback_query(F.data == "broadcast:confirm")
-async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: JsonStore, settings: Settings):
+async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
@@ -339,7 +339,7 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: J
 
 
 @router.callback_query(F.data == "broadcast:cancel")
-async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings, store: JsonStore):
+async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings, store: MongoStore):
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("ፈቃድ የለዎትም።", show_alert=True)
         return
@@ -353,7 +353,7 @@ async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings:
 
 
 @router.callback_query(F.data == "member:profile")
-async def member_profile(callback: CallbackQuery, store: JsonStore):
+async def member_profile(callback: CallbackQuery, store: MongoStore):
     user = await store.get_user(callback.from_user.id)
     if not user:
         await callback.answer("እባክዎ መጀመሪያ /start በመጠቀም ይመዝገቡ።", show_alert=True)
@@ -366,7 +366,7 @@ async def member_profile(callback: CallbackQuery, store: JsonStore):
 
 
 @router.callback_query(F.data == "member:batch")
-async def member_change_batch(callback: CallbackQuery, state: FSMContext, store: JsonStore, settings: Settings):
+async def member_change_batch(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     user = await store.get_user(callback.from_user.id)
     if not user:
         await callback.answer("እባክዎ መጀመሪያ /start በመጠቀም ይመዝገቡ።", show_alert=True)
@@ -402,7 +402,7 @@ async def collect_name(message: Message, state: FSMContext, settings: Settings):
 
 
 @router.message(Registration.choosing_batch, F.text & ~F.text.startswith("/"))
-async def collect_batch(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
+async def collect_batch(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     batch = (message.text or "").strip()
     if batch not in settings.batches:
         await message.answer("እባክዎ ከታች ባለው ምናሌ የትምህርት ዓመትዎን ይምረጡ።", reply_markup=batch_keyboard(settings.batches))
@@ -426,7 +426,7 @@ async def collect_batch(message: Message, state: FSMContext, store: JsonStore, s
 
 @router.message(Command("profile"))
 @router.message(Command("my_batch"))
-async def profile(message: Message, store: JsonStore):
+async def profile(message: Message, store: MongoStore):
     user = await store.get_user(message.from_user.id)
     if not user:
         await message.answer("ገና አልተመዘገቡም። /start ይጠቀሙ።")
@@ -435,7 +435,7 @@ async def profile(message: Message, store: JsonStore):
 
 
 @router.message(Command("edit_batch"))
-async def edit_batch(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
+async def edit_batch(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     user = await store.get_user(message.from_user.id)
     if not user:
         await message.answer("እባክዎ መጀመሪያ /start ይጠቀሙ።")
@@ -446,7 +446,7 @@ async def edit_batch(message: Message, state: FSMContext, store: JsonStore, sett
 
 
 @router.message(Command("cancel"))
-async def cancel(message: Message, state: FSMContext, settings: Settings, store: JsonStore):
+async def cancel(message: Message, state: FSMContext, settings: Settings, store: MongoStore):
     await state.clear()
     if admin_only(settings, message):
         await show_admin_home(message, state, store, settings)
@@ -479,7 +479,7 @@ async def help_command(message: Message, settings: Settings):
 
 
 @router.message(Command("users"))
-async def users_command(message: Message, store: JsonStore, settings: Settings):
+async def users_command(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
@@ -494,7 +494,7 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
     await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
-async def send_to_target(message: Message, store: JsonStore, target: str, text: str, settings: Settings) -> tuple[int, int, int]:
+async def send_to_target(message: Message, store: MongoStore, target: str, text: str, settings: Settings) -> tuple[int, int, int]:
     recipients = [
         user for user in await store.list_users(None if target.lower() == "all" else target)
         if user["telegram_id"] != settings.super_admin_id
@@ -532,7 +532,7 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
 
 
 @router.message(Command("schedule"))
-async def schedule_message(message: Message, store: JsonStore, settings: Settings):
+async def schedule_message(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
@@ -569,7 +569,7 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
 
 
 @router.message(Command("schedules"))
-async def list_schedules(message: Message, store: JsonStore, settings: Settings):
+async def list_schedules(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return
@@ -588,7 +588,7 @@ async def list_schedules(message: Message, store: JsonStore, settings: Settings)
 
 
 @router.message(Command("cancel_schedule"))
-async def cancel_schedule(message: Message, store: JsonStore, settings: Settings):
+async def cancel_schedule(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
         return

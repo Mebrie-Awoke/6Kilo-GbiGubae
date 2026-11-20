@@ -6,12 +6,12 @@ from datetime import datetime, timezone
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 
 from bot.config import Settings
-from bot.storage import JsonStore
+from bot.storage import MongoStore
 
 logger = logging.getLogger(__name__)
 
 
-async def deliver_due_messages(bot, store: JsonStore, settings: Settings) -> None:
+async def deliver_due_messages(bot, store: MongoStore, settings: Settings) -> None:
     due = await store.due_schedules(datetime.now(timezone.utc))
     for schedule in due:
         recipients = await store.list_users(
@@ -41,7 +41,7 @@ async def deliver_due_messages(bot, store: JsonStore, settings: Settings) -> Non
             await store.complete_schedule(schedule["id"])
 
 
-async def scheduler_loop(bot, store: JsonStore, settings: Settings) -> None:
+async def scheduler_loop(bot, store: MongoStore, settings: Settings) -> None:
     logger.info("Scheduler started; checking for due messages every 15 seconds.")
     while True:
         try:
