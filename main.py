@@ -112,11 +112,6 @@ async def main() -> None:
             update_worker.cancel()
             await asyncio.gather(update_worker, return_exceptions=True)
 
-        try:
-            await bot.delete_webhook(drop_pending_updates=False)
-        except Exception:
-            logger.exception("Could not clear webhook during shutdown")
-
         await dp.storage.close()
         await bot.session.close()
         await engine.dispose()
