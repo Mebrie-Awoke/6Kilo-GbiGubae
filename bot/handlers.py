@@ -201,7 +201,7 @@ async def admin_overview_menu(message: Message, store: MongoStore, settings: Set
     lines = ["📊 <b>Community Overview</b>", "━━━━━━━━━━━━━━━━━━",
              f"Total registered members: <b>{len(users)}</b>", ""]
     lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
-    await message.answer("\\n".join(lines), reply_markup=admin_menu())
+    await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
 @router.message(F.text == "🔄 Refresh Menu")
