@@ -576,7 +576,7 @@ async def add_admin_command(message: Message, store: MongoStore, settings: Setti
         await message.answer("Member not found. Ask the user to register with /start first.")
         return
     if await store.add_admin(target_id, message.from_user.id):
-        await message.answer(f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\nTelegram ID: <code>{target_id}</code>")
+        await message.answer(f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\nTelegram ID: <code>{target_id}</code>")
     else:
         await message.answer("This member is already an administrator.")
 
@@ -602,8 +602,8 @@ async def admin_add_page(callback: CallbackQuery, store: MongoStore, settings: S
     else:
         page = max(0, min(page, (len(candidates) - 1) // 8))
         await callback.message.edit_text(
-            "🛡 <b>Add Administrator</b>\\n\\n"
-            "Select a registered member to grant administrator access.\\n"
+            "🛡 <b>Add Administrator</b>\n\n"
+            "Select a registered member to grant administrator access.\n"
             f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(candidates))} of {len(candidates)} eligible members.",
             reply_markup=admin_candidate_keyboard(candidates, page),
         )
@@ -626,8 +626,8 @@ async def admin_add_selected(callback: CallbackQuery, store: MongoStore, setting
         return
     if await store.add_admin(target_id, callback.from_user.id):
         await callback.message.edit_text(
-            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
-            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
+            f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\n"
+            f"Academic year: {escape(member['batch'])}\nTelegram ID: <code>{target_id}</code>"
         )
         await callback.answer("Administrator access granted.")
     else:
@@ -690,9 +690,9 @@ async def help_command(message: Message, settings: Settings, store: MongoStore):
             "/schedule YYYY-MM-DD HH:MM | batch | message — Schedule using Ethiopian date (E.C.)\n"
             "/schedules — View scheduled messages\n"
             "/cancel_schedule ID — Cancel a scheduled message\n"
-            "/menu — Open the admin workspace\\n"
-            "/admins — List additional admins (super admin)\\n"
-            "/add_admin ID — Grant admin access (super admin)\\n"
+            "/menu — Open the admin workspace\n"
+            "/admins — List additional admins (super admin)\n"
+            "/add_admin ID — Grant admin access (super admin)\n"
             "/remove_admin ID — Revoke admin access (super admin)"
         )
     else:
