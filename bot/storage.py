@@ -18,10 +18,12 @@ class MongoStore:
         self.schedules = self.db["schedules"]
         self.counters = self.db["counters"]
         self.locks = self.db["locks"]
+        self.admins = self.db["admins"]
 
     async def connect(self) -> None:
         await self.client.admin.command("ping")
         await self.users.create_index([("batch", ASCENDING)])
+        await self.admins.create_index([("telegram_id", ASCENDING)], unique=True)
         await self.schedules.create_index([("status", ASCENDING), ("send_at", ASCENDING)])
         await self.counters.update_one(
             {"_id": "schedule_id"},
@@ -69,6 +71,34 @@ class MongoStore:
             {"_id": "scheduler", "owner": owner},
             {"$set": {"owner": None, "lease_until": datetime.now(timezone.utc)}},
         )
+
+
+    async def is_admin(self, user_id: int, super_admin_id: int) -> bool:
+        if int(user_id) == int(super_admin_id):
+            return True
+        return await self.admins.find_one({"telegram_id": int(user_id)}) is not None
+
+    async def list_admins(self) -> list[dict[str, Any]]:
+        cursor = self.admins.find({}).sort("telegram_id", ASCENDING)
+        return [item async for item in cursor]
+
+    async def add_admin(self, user_id: int, added_by: int) -> bool:
+        result = await self.admins.update_one(
+            {"telegram_id": int(user_id)},
+            {"$setOnInsert": {
+                "telegram_id": int(user_id),
+                "added_by": int(added_by),
+                "added_at": datetime.now(timezone.utc),
+            }},
+            upsert=True,
+        )
+        return result.upserted_id is not None
+
+    async def remove_admin(self, user_id: int, super_admin_id: int) -> bool:
+        if int(user_id) == int(super_admin_id):
+            return False
+        result = await self.admins.delete_one({"telegram_id": int(user_id)})
+        return result.deleted_count > 0
 
     async def save_user(self, user_id: int, name: str, batch: str) -> None:
         await self.users.update_one(
