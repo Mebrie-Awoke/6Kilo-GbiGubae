@@ -254,6 +254,7 @@ class BroadcastManager:
 # SCHEDULER LOGIC
 # ==============================================================================
 running_schedules = set()
+schedule_tasks = set()
 broadcast_manager: BroadcastManager = None
 
 async def execute_schedule_logic(bot: Bot, sched_id: int):
@@ -368,8 +369,12 @@ async def scheduler_loop(bot: Bot):
                         continue
                     
                     running_schedules.add(sched.id)
-                    # Use create_task to run non-blocking
-                    asyncio.create_task(execute_schedule_logic(bot, sched.id))
+                    task = asyncio.create_task(
+                        execute_schedule_logic(bot, sched.id),
+                        name=f"schedule-{sched.id}",
+                    )
+                    schedule_tasks.add(task)
+                    task.add_done_callback(schedule_tasks.discard)
 
             await asyncio.sleep(10)
 
