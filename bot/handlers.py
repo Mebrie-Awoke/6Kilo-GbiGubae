@@ -39,19 +39,33 @@ def command_payload(message: Message) -> str:
     return (message.text or "").partition(" ")[2].strip()
 
 
+def normalize_batch(value: str, settings: Settings) -> str | None:
+    """Accept canonical labels, numeric years, and legacy Amharic labels."""
+    cleaned = " ".join(value.strip().casefold().split())
+    aliases = {
+        "1": "1st Year", "1st": "1st Year", "1st year": "1st Year", "1ኛ ዓመት": "1st Year",
+        "2": "2nd Year", "2nd": "2nd Year", "2nd year": "2nd Year", "2ኛ ዓመት": "2nd Year",
+        "3": "3rd Year", "3rd": "3rd Year", "3rd year": "3rd Year", "3ኛ ዓመት": "3rd Year",
+        "4": "4th Year", "4th": "4th Year", "4th year": "4th Year", "4ኛ ዓመት": "4th Year",
+        "5": "5th Year", "5th": "5th Year", "5th year": "5th Year", "5ኛ ዓመት": "5th Year",
+        "6": "6th Year", "6th": "6th Year", "6th year": "6th Year", "6ኛ ዓመት": "6th Year",
+    }
+    candidate = aliases.get(cleaned, value.strip())
+    return next((batch for batch in settings.batches if batch.casefold() == candidate.casefold()), None)
+
+
 def valid_target(target: str, settings: Settings) -> bool:
-    return target.lower() == "all" or target in settings.batches
+    return target.casefold() == "all" or normalize_batch(target, settings) is not None
 
 
 
 def display_batch(batch: str) -> str:
-    labels = {"1st Year": "1ኛ ዓመት", "2nd Year": "2ኛ ዓመት", "3rd Year": "3ኛ ዓመት", "4th Year": "4ኛ ዓመት", "5th Year": "5ኛ ዓመት", "6th Year": "6ኛ ዓመት"}
-    return "ሁሉም አባላት" if batch.lower() == "all" else labels.get(batch, batch)
+    return "All Members" if batch.casefold() == "all" else batch
 
 
 def batch_keyboard(batches: tuple[str, ...]) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=display_batch(batch))] for batch in batches],
+        keyboard=[[KeyboardButton(text=batch)] for batch in batches],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
@@ -109,10 +123,10 @@ async def show_admin_home(message: Message, state: FSMContext, store: MongoStore
 async def show_member_home(message: Message, user: dict, state: FSMContext, settings: Settings) -> None:
     await state.clear()
     await message.answer(
-        f"👋 እንኳን በደህና ተመለሱ፣ <b>{escape(user['name'])}</b>!\n\n"
-        f"🎓 የትምህርት ዓመት: <b>{escape(user['batch'])}</b>\n"
-        f"📅 የዛሬ ቀን: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
-        "የአባልነት መለያዎ ዝግጁ ነው።",
+        ff"👋 <b>Welcome back, {escape(user['name'])}!</b>\n\n"
+        f"🎓 Academic year: <b>{escape(user['batch'])}</b>\n"
+        f"📅 Ethiopian date: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
+        "Your membership profile is active.",
         reply_markup=member_menu(),
     )
 
@@ -120,9 +134,9 @@ async def show_member_home(message: Message, user: dict, state: FSMContext, sett
 async def start_registration(message: Message, state: FSMContext) -> None:
     await state.set_state(Registration.entering_name)
     await message.answer(
-        "👋 <b>ወደ 6ኪሎ ግቢጉባኤ እንኳን በደህና መጡ!</b>\n\n"
-        "የአባልነት መረጃዎን እናዘጋጅ።\n"
-        "እባክዎ ሙሉ ስምዎን ያስገቡ።",
+        "👋 <b>Welcome to 6Kilo GbiGubae</b>\n\n"
+        "Let's set up your membership profile.\n"
+        "Please enter your full name.",
         reply_markup=ReplyKeyboardRemove(),
     )
 
@@ -143,7 +157,7 @@ async def start(message: Message, state: FSMContext, store: MongoStore, settings
 @router.message(Command("admin"))
 async def admin_home(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ የሥራ ቦታ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This workspace is restricted to administrators.")
         return
     await show_admin_home(message, state, store, settings)
 
@@ -356,7 +370,7 @@ async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings:
 async def member_profile(callback: CallbackQuery, store: MongoStore):
     user = await store.get_user(callback.from_user.id)
     if not user:
-        await callback.answer("እባክዎ መጀመሪያ /start በመጠቀም ይመዝገቡ።", show_alert=True)
+        await callback.answer("Please complete registration first using /start.", show_alert=True)
         return
     await callback.message.answer(
         f"👤 <b>የእርስዎ የአባልነት መረጃ</b>\n\n"
@@ -369,11 +383,11 @@ async def member_profile(callback: CallbackQuery, store: MongoStore):
 async def member_change_batch(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     user = await store.get_user(callback.from_user.id)
     if not user:
-        await callback.answer("እባክዎ መጀመሪያ /start በመጠቀም ይመዝገቡ።", show_alert=True)
+        await callback.answer("Please complete registration first using /start.", show_alert=True)
         return
     await state.update_data(name=user["name"])
     await state.set_state(Registration.choosing_batch)
-    await callback.message.answer("🎓 አዲሱን የትምህርት ዓመት ይምረጡ:", reply_markup=batch_keyboard(settings.batches))
+    await callback.message.answer("🎓 <b>Select your new academic year</b>", reply_markup=batch_keyboard(settings.batches))
     await callback.answer()
 
 
@@ -394,18 +408,22 @@ async def member_help(callback: CallbackQuery):
 async def collect_name(message: Message, state: FSMContext, settings: Settings):
     name = (message.text or "").strip()
     if len(name) < 2 or len(name) > 80:
-        await message.answer("እባክዎ ከ2 እስከ 80 ፊደላት ያሉትን ስም ያስገቡ።")
+        await message.answer("Please enter a name between 2 and 80 characters.")
         return
     await state.update_data(name=name)
     await state.set_state(Registration.choosing_batch)
-    await message.answer("🎓 የትምህርት ዓመትዎን ይምረጡ:", reply_markup=batch_keyboard(settings.batches))
+    await message.answer("🎓 <b>Select your academic year</b>", reply_markup=batch_keyboard(settings.batches))
 
 
 @router.message(Registration.choosing_batch, F.text & ~F.text.startswith("/"))
 async def collect_batch(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
-    batch = (message.text or "").strip()
-    if batch not in settings.batches:
-        await message.answer("እባክዎ ከታች ባለው ምናሌ የትምህርት ዓመትዎን ይምረጡ።", reply_markup=batch_keyboard(settings.batches))
+    batch = normalize_batch(message.text or "", settings)
+    if batch is None:
+        await message.answer(
+            "Please choose an academic year using one of the buttons below. "
+            "You can also type 1, 2, 3, 4, 5, or 6.",
+            reply_markup=batch_keyboard(settings.batches),
+        )
         return
     data = await state.get_data()
     name = data.get("name")
@@ -418,10 +436,10 @@ async def collect_batch(message: Message, state: FSMContext, store: MongoStore, 
     await message.answer(
         "✅ <b>ምዝገባዎ ተጠናቋል</b>\n\n"
         f"ስም: <b>{escape(name)}</b>\nየትምህርት ዓመት: <b>{escape(batch)}</b>\n\n"
-        "ከአሁን በኋላ ለትምህርት ዓመትዎ የሚላኩ ማስታወቂያዎችን ያገኛሉ።",
+        "You will now receive announcements intended for your academic year.",
         reply_markup=ReplyKeyboardRemove(),
     )
-    await message.answer("የአባልነት ምናሌዎ:", reply_markup=member_menu())
+    await message.answer("Your membership menu:", reply_markup=member_menu())
 
 
 @router.message(Command("profile"))
@@ -438,11 +456,11 @@ async def profile(message: Message, store: MongoStore):
 async def edit_batch(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     user = await store.get_user(message.from_user.id)
     if not user:
-        await message.answer("እባክዎ መጀመሪያ /start ይጠቀሙ።")
+        await message.answer("Please register first using /start.")
         return
     await state.update_data(name=user["name"])
     await state.set_state(Registration.choosing_batch)
-    await message.answer("🎓 አዲሱን የትምህርት ዓመት ይምረጡ።", reply_markup=batch_keyboard(settings.batches))
+    await message.answer("🎓 <b>Select your new academic year</b>", reply_markup=batch_keyboard(settings.batches))
 
 
 @router.message(Command("cancel"))
