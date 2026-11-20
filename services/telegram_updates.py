@@ -13,7 +13,7 @@ from db.models import TelegramUpdate
 from db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
-STALE_UPDATE_LOCK = timedelta(minutes=2)
+STALE_UPDATE_LOCK = timedelta(minutes=15)
 MAX_UPDATE_ATTEMPTS = 10
 
 
