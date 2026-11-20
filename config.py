@@ -8,8 +8,13 @@ from db.url import normalize_async_database_url
 load_dotenv()
 
 BOT_TOKEN = os.getenv("TG_BOT_TOKEN") or os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("TG_BOT_TOKEN (or BOT_TOKEN) is required.")
 
 _super_admin_id = os.getenv("SUPER_ADMIN_ID")
+if not _super_admin_id:
+    raise RuntimeError("SUPER_ADMIN_ID is required. Set it to the Telegram ID of the super admin.")
+
 try:
     SUPER_ADMIN_ID = int(_super_admin_id) if _super_admin_id else None
 except ValueError as exc:
