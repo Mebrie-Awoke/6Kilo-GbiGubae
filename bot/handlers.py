@@ -513,29 +513,134 @@ async def cancel(message: Message, state: FSMContext, settings: Settings, store:
 
 
 
+def admin_candidate_keyboard(users: list[dict], page: int = 0) -> InlineKeyboardMarkup:
+    page_size = 8
+    start = page * page_size
+    visible = users[start:start + page_size]
+    rows = [
+        [InlineKeyboardButton(
+            text=f"{user['name'][:38]} · {user['batch']}",
+            callback_data=f"admin:add:{user['telegram_id']}",
+        )]
+        for user in visible
+    ]
+    navigation = []
+    if page > 0:
+        navigation.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"admin:add_page:{page - 1}"))
+    if start + page_size < len(users):
+        navigation.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"admin:add_page:{page + 1}"))
+    if navigation:
+        rows.append(navigation)
+    rows.append([InlineKeyboardButton(text="✖ Close", callback_data="admin:add_close")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def show_admin_candidates(message: Message, store: MongoStore, settings: Settings, page: int = 0):
+    members = await store.list_users()
+    candidates = []
+    for member in members:
+        if member["telegram_id"] == settings.super_admin_id:
+            continue
+        if not await store.is_admin(member["telegram_id"], settings.super_admin_id):
+            candidates.append(member)
+    if not candidates:
+        await message.answer("All registered members already have administrator access.")
+        return
+    page = max(0, min(page, (len(candidates) - 1) // 8))
+    await message.answer(
+        "🛡 <b>Add Administrator</b>\n\n"
+        "Select a registered member to grant administrator access.\n"
+        f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(candidates))} of {len(candidates)} eligible members.",
+        reply_markup=admin_candidate_keyboard(candidates, page),
+    )
+
+
 @router.message(Command("add_admin"))
 async def add_admin_command(message: Message, store: MongoStore, settings: Settings):
     if not is_super_admin(settings, message.from_user.id if message.from_user else None):
         await message.answer("⛔ Only the super admin can manage administrator access.")
         return
+    payload = command_payload(message)
+    if not payload:
+        await show_admin_candidates(message, store, settings)
+        return
     try:
-        target_id = int(command_payload(message))
+        target_id = int(payload)
         if target_id <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("Usage: /add_admin TELEGRAM_ID\nThe user must already be registered.")
-        return
-    if target_id == settings.super_admin_id:
-        await message.answer("This account is already the super admin.")
+        await message.answer("Usage: /add_admin or /add_admin TELEGRAM_ID")
         return
     member = await store.get_user(target_id)
     if not member:
         await message.answer("Member not found. Ask the user to register with /start first.")
         return
     if await store.add_admin(target_id, message.from_user.id):
-        await message.answer(f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\nTelegram ID: <code>{target_id}</code>")
+        await message.answer(f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\nTelegram ID: <code>{target_id}</code>")
     else:
         await message.answer("This member is already an administrator.")
+
+
+@router.callback_query(F.data.startswith("admin:add_page:"))
+async def admin_add_page(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Only the super admin can manage administrators.", show_alert=True)
+        return
+    try:
+        page = int(callback.data.rsplit(":", 1)[1])
+    except (ValueError, AttributeError):
+        await callback.answer("Invalid page.", show_alert=True)
+        return
+    members = await store.list_users()
+    candidates = [
+        member for member in members
+        if member["telegram_id"] != settings.super_admin_id
+        and not await store.is_admin(member["telegram_id"], settings.super_admin_id)
+    ]
+    if not candidates:
+        await callback.message.edit_text("All registered members already have administrator access.")
+    else:
+        page = max(0, min(page, (len(candidates) - 1) // 8))
+        await callback.message.edit_text(
+            "🛡 <b>Add Administrator</b>\\n\\n"
+            "Select a registered member to grant administrator access.\\n"
+            f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(candidates))} of {len(candidates)} eligible members.",
+            reply_markup=admin_candidate_keyboard(candidates, page),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:add:"))
+async def admin_add_selected(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Only the super admin can manage administrators.", show_alert=True)
+        return
+    try:
+        target_id = int(callback.data.rsplit(":", 1)[1])
+    except (ValueError, AttributeError):
+        await callback.answer("Invalid member selection.", show_alert=True)
+        return
+    member = await store.get_user(target_id)
+    if not member:
+        await callback.answer("This member is no longer registered.", show_alert=True)
+        return
+    if await store.add_admin(target_id, callback.from_user.id):
+        await callback.message.edit_text(
+            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
+            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
+        )
+        await callback.answer("Administrator access granted.")
+    else:
+        await callback.answer("This member is already an administrator.", show_alert=True)
+
+
+@router.callback_query(F.data == "admin:add_close")
+async def admin_add_close(callback: CallbackQuery, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Access denied.", show_alert=True)
+        return
+    await callback.message.edit_text("Administrator selection closed.")
+    await callback.answer()
 
 
 @router.message(Command("remove_admin"))
