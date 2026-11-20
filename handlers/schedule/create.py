@@ -5,6 +5,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from datetime import datetime, timedelta
 import re
+from html import escape
 from loader import dp
 from db.session import AsyncSessionLocal
 from db.models import Batch, ScheduleType
@@ -329,13 +330,13 @@ async def process_message(message: types.Message, state: FSMContext):
         media_icon = {"photo": "📷", "video": "🎥", "document": "📄"}.get(media_type, "")
         content_preview = f"{media_icon} <b>Media:</b> {media_type.title()}"
         if caption:
-            content_preview += f"\n<b>Caption:</b>\n<pre>{caption}</pre>"
+            content_preview += f"\n<b>Caption:</b>\n<pre>{escape(caption)}</pre>"
     else:
-        content_preview = f"<b>Message:</b>\n<pre>{text_message}</pre>"
+        content_preview = f"<b>Message:</b>\n<pre>{escape(text_message)}</pre>"
 
     preview = (
         f"<b>New Schedule</b>\n\n"
-        f"<b>Batches:</b> {', '.join(batch_names)}\n"
+        f"<b>Batches:</b> {', '.join(escape(name) for name in batch_names)}\n"
         f"<b>Type:</b> {data['schedule_type'].value.title()}\n"
         f"<b>Send Time:</b> {nice_time}\n\n"
         f"{content_preview}\n\n"
