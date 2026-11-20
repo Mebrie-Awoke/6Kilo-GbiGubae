@@ -49,7 +49,7 @@ def format_ethiopian(value: datetime, tz: tzinfo) -> str:
     """Format a datetime in the configured local timezone and Ethiopian date."""
     local = value.astimezone(tz)
     year, month, day = from_gregorian(local.date())
-    return f"{day:02d} {MONTHS[month - 1]} {year} E.C. · {local:%H:%M}"
+    return f"{day:02d} {MONTHS[month - 1]} {year} ዓ.ም. · {local:%H:%M}"
 
 
 def parse_ethiopian_datetime(value: str, tz: tzinfo) -> datetime:
