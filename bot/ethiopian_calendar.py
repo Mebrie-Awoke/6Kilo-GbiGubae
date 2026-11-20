@@ -7,9 +7,9 @@ from datetime import date, datetime, time, tzinfo
 
 ETHIOPIAN_EPOCH_JDN = 1723856
 MONTHS = (
-    "Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir",
-    "Yekatit", "Megabit", "Miyazya", "Ginbot", "Sene",
-    "Hamle", "Nehase", "Pagume",
+    "መስከረም", "ጥቅምት", "ኅዳር", "ታኅሣሥ", "ጥር",
+    "የካቲት", "መጋቢት", "ሚያዝያ", "ግንቦት", "ሰኔ",
+    "ሐምሌ", "ነሐሴ", "ጳጉሜ",
 )
 
 
