@@ -1,6 +1,7 @@
 # db/models.py — ULTIMATE VERSION
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Table, Text
+    Column, Integer, String, Boolean, DateTime, ForeignKey, Enum, Table, Text,
+    JSON, BigInteger, UniqueConstraint, Index
 )
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.orm import relationship, declarative_base
@@ -62,3 +63,72 @@ class Schedule(Base):
         secondary=schedule_batch_association,
         back_populates="schedules"
     )
+
+
+class TelegramUpdate(Base):
+    """Durable inbox for Telegram webhook updates."""
+    __tablename__ = "telegram_updates"
+
+    update_id = Column(BigInteger, primary_key=True)
+    payload = Column(JSON, nullable=False)
+    status = Column(String(20), nullable=False, default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    received_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    locked_at = Column(DateTime, nullable=True)
+    processed_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+
+
+class FSMState(Base):
+    """Persistent Aiogram conversation state and data."""
+    __tablename__ = "fsm_states"
+
+    key = Column(String(255), primary_key=True)
+    state = Column(String(255), nullable=True)
+    data = Column(JSON, nullable=False, default=dict)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class BroadcastRun(Base):
+    """One occurrence of a recurring schedule."""
+    __tablename__ = "broadcast_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "schedule_id", "scheduled_for",
+            name="uq_broadcast_run_schedule_occurrence",
+        ),
+        Index("ix_broadcast_runs_status", "status"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    schedule_id = Column(
+        Integer, ForeignKey("schedules.id", ondelete="CASCADE"), nullable=False
+    )
+    scheduled_for = Column(DateTime, nullable=False)
+    status = Column(String(30), nullable=False, default="pending")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+class BroadcastDelivery(Base):
+    """Persistent per-user delivery record; survives worker restarts."""
+    __tablename__ = "broadcast_deliveries"
+    __table_args__ = (
+        UniqueConstraint("run_id", "user_id", name="uq_broadcast_delivery_recipient"),
+        Index("ix_broadcast_deliveries_status", "status"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    run_id = Column(
+        Integer, ForeignKey("broadcast_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id = Column(BigInteger, nullable=False)
+    full_name = Column(String, nullable=True)
+    message = Column(Text, nullable=True)
+    media_type = Column(String, nullable=True)
+    media_file_id = Column(String, nullable=True)
+    status = Column(String(20), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    locked_at = Column(DateTime, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
