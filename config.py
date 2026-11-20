@@ -1,5 +1,6 @@
 """Application configuration loaded from environment variables."""
 import os
+import re
 
 from dotenv import load_dotenv
 
@@ -28,6 +29,9 @@ DATABASE_URL = (
 )
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+if WEBHOOK_SECRET and not re.fullmatch(r"[A-Za-z0-9_-]{1,256}", WEBHOOK_SECRET):
+    raise ValueError("WEBHOOK_SECRET must contain 1-256 letters, numbers, underscores, or hyphens.")
+
 WEBHOOK_BASE_URL = (
     os.getenv("WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
 )
