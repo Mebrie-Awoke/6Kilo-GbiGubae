@@ -12,14 +12,18 @@ from bot.storage import MongoStore
 logger = logging.getLogger(__name__)
 
 
-async def deliver_due_messages(bot, store: MongoStore, settings: Settings) -> None:
+async def deliver_due_messages(bot, store: MongoStore, settings: Settings, lease_lost: asyncio.Event | None = None) -> None:
     due = await store.due_schedules(datetime.now(timezone.utc))
     for schedule in due:
+        if lease_lost and lease_lost.is_set():
+            return
         recipients = await store.list_users(
             None if schedule["batch"].lower() == "all" else schedule["batch"]
         )
         already_handled = set(schedule.get("sent_to", [])) | set(schedule.get("failed_to", []))
         for recipient in recipients:
+            if lease_lost and lease_lost.is_set():
+                return
             user_id = recipient["telegram_id"]
             if user_id in already_handled:
                 continue
@@ -45,11 +49,18 @@ async def deliver_due_messages(bot, store: MongoStore, settings: Settings) -> No
             await store.complete_schedule(schedule["id"])
 
 
-async def _renew_lock(store: MongoStore, owner: str) -> None:
+async def _renew_lock(store: MongoStore, owner: str, lease_lost: asyncio.Event) -> None:
     while True:
         await asyncio.sleep(15)
-        if not await store.renew_scheduler_lock(owner):
+        try:
+            renewed = await store.renew_scheduler_lock(owner)
+        except Exception:
+            logger.exception("Could not renew scheduler lease; stopping this worker.")
+            lease_lost.set()
+            return
+        if not renewed:
             logger.error("Scheduler lease was lost; stopping this worker.")
+            lease_lost.set()
             return
 
 
@@ -59,9 +70,10 @@ async def scheduler_loop(bot, store: MongoStore, settings: Settings) -> None:
     while True:
         try:
             if await store.acquire_scheduler_lock(owner):
-                heartbeat = asyncio.create_task(_renew_lock(store, owner))
+                lease_lost = asyncio.Event()
+                heartbeat = asyncio.create_task(_renew_lock(store, owner, lease_lost))
                 try:
-                    await deliver_due_messages(bot, store, settings)
+                    await deliver_due_messages(bot, store, settings, lease_lost)
                 finally:
                     heartbeat.cancel()
                     await asyncio.gather(heartbeat, return_exceptions=True)
