@@ -21,6 +21,7 @@ from aiogram.types import (
 from bot.config import Settings
 from bot.ethiopian_calendar import format_ethiopian, parse_ethiopian_datetime
 from bot.states import AdminBroadcast, Registration
+from bot.messaging import personalize_announcement
 from bot.storage import MongoStore
 
 logger = logging.getLogger(__name__)
@@ -520,7 +521,11 @@ async def send_to_target(message: Message, store: MongoStore, target: str, text:
     sent = failed = 0
     for recipient in recipients:
         try:
-            await message.bot.send_message(recipient["telegram_id"], text, parse_mode=None)
+            await message.bot.send_message(
+                recipient["telegram_id"],
+                personalize_announcement(recipient.get("name"), text),
+                parse_mode=None,
+            )
             sent += 1
             await asyncio.sleep(0.05)
         except Exception:
