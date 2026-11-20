@@ -46,7 +46,7 @@ def valid_target(target: str, settings: Settings) -> bool:
 
 def display_batch(batch: str) -> str:
     labels = {"1st Year": "1ኛ ዓመት", "2nd Year": "2ኛ ዓመት", "3rd Year": "3ኛ ዓመት", "4th Year": "4ኛ ዓመት", "5th Year": "5ኛ ዓመት", "6th Year": "6ኛ ዓመት"}
-    return labels.get(batch, batch)
+    return "ሁሉም አባላት" if batch.lower() == "all" else labels.get(batch, batch)
 
 
 def batch_keyboard(batches: tuple[str, ...]) -> ReplyKeyboardMarkup:
@@ -563,7 +563,7 @@ async def schedule_message(message: Message, store: JsonStore, settings: Setting
     )
     await message.answer(
         "✅ <b>ማስታወቂያው በመርሐግብር ተይዟል</b>\n\n"
-        f"መለያ ቁጥር: <b>#{item['id']}</b>\nተቀባዮች: <b>{escape(target)}</b>\n"
+        f"መለያ ቁጥር: <b>#{item['id']}</b>\nተቀባዮች: <b>{escape(display_batch(target))}</b>\n"
         f"የሚላክበት ጊዜ: <b>{format_ethiopian(scheduled_at, ZoneInfo(settings.timezone))}</b>"
     )
 
