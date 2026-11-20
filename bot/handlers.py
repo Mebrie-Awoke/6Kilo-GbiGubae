@@ -822,7 +822,7 @@ async def help_command(message: Message, settings: Settings, store: MongoStore):
             "/cancel_schedule ID — Cancel a scheduled message\n"
             "/menu — Open the admin workspace\n"
             "/admins — List additional admins (super admin)\n"
-            "/add_admin ID — Grant admin access (super admin)\n"
+            "/add_admin — Select a member to promote (super admin)\n"
             "/remove_admin — Select an admin to remove (super admin)"
         )
     else:
