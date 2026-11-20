@@ -55,6 +55,7 @@ class Schedule(Base):
     type = Column(Enum(ScheduleType), nullable=False)
     cron_expr = Column(String, nullable=True)      # e.g., "0 9 * * 1"
     next_run = Column(DateTime, nullable=True)     # When to send next
+    monthly_day = Column(Integer, nullable=True)  # Original day-of-month anchor
     created_at = Column(DateTime, default=datetime.utcnow)
     admin_id = Column(BIGINT, nullable=False)      # ← Telegram ID
     is_active = Column(Boolean, default=True)
