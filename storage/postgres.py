@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from db.models import FSMState
 from db.session import AsyncSessionLocal
+from storage.json_codec import decode_fsm_value, encode_fsm_value
 
 
 class PostgresStorage(BaseStorage):
@@ -50,7 +51,7 @@ class PostgresStorage(BaseStorage):
     async def set_data(self, key: StorageKey, data: dict) -> None:
         storage_key = self._key(key)
         now = datetime.utcnow()
-        safe_data = dict(data or {})
+        safe_data = encode_fsm_value(dict(data or {}))
         statement = insert(FSMState).values(
             key=storage_key,
             state=None,
@@ -67,7 +68,7 @@ class PostgresStorage(BaseStorage):
     async def get_data(self, key: StorageKey) -> dict:
         async with AsyncSessionLocal() as session:
             row = await session.get(FSMState, self._key(key))
-            return dict(row.data or {}) if row else {}
+            return decode_fsm_value(dict(row.data or {})) if row else {}
 
     async def close(self) -> None:
         # The shared SQLAlchemy engine is disposed by the application lifecycle.
