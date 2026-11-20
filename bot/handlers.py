@@ -37,7 +37,10 @@ def admin_only(settings: Settings, message: Message) -> bool:
 
 
 def command_payload(message: Message) -> str:
-    return (message.text or "").partition(" ")[2].strip()
+    text = message.text or ""
+    if not text.startswith("/"):
+        return ""
+    return text.partition(" ")[2].strip()
 
 
 def normalize_batch(value: str, settings: Settings) -> str | None:
@@ -79,15 +82,18 @@ def member_menu() -> InlineKeyboardMarkup:
     ])
 
 
-def admin_menu() -> InlineKeyboardMarkup:
-    """A clean, single-column menu matching the member academic-year picker."""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊  Overview", callback_data="admin:overview")],
-        [InlineKeyboardButton(text="👥  Members", callback_data="admin:members")],
-        [InlineKeyboardButton(text="📣  New Announcement", callback_data="admin:broadcast")],
-        [InlineKeyboardButton(text="🗓  Scheduled Messages", callback_data="admin:schedules")],
-        [InlineKeyboardButton(text="❔  Help & Commands", callback_data="admin:help")],
-    ])
+def admin_menu() -> ReplyKeyboardMarkup:
+    """Two-column administrator menu using Telegram's persistent reply keyboard."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📊 Overview"), KeyboardButton(text="👥 Members")],
+            [KeyboardButton(text="📣 New Announcement"), KeyboardButton(text="🗓 Schedule Announcement")],
+            [KeyboardButton(text="📋 Scheduled Messages"), KeyboardButton(text="🗑 Cancel Scheduled Message")],
+            [KeyboardButton(text="❔ Help & Commands"), KeyboardButton(text="🔄 Refresh Menu")],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
 
 
 def target_keyboard(settings: Settings) -> InlineKeyboardMarkup:
@@ -183,6 +189,27 @@ async def menu_command(message: Message, state: FSMContext, store: MongoStore, s
     await show_member_home(message, user, state, settings)
 
 
+@router.message(F.text == "📊 Overview")
+async def admin_overview_menu(message: Message, store: MongoStore, settings: Settings):
+    if not admin_only(settings, message):
+        return
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
+    counts = {batch: 0 for batch in settings.batches}
+    for user in users:
+        if user.get("batch") in counts:
+            counts[user["batch"]] += 1
+    lines = ["📊 <b>Community Overview</b>", "━━━━━━━━━━━━━━━━━━",
+             f"Total registered members: <b>{len(users)}</b>", ""]
+    lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
+    await message.answer("\\n".join(lines), reply_markup=admin_menu())
+
+
+@router.message(F.text == "🔄 Refresh Menu")
+async def refresh_admin_menu(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
+    if admin_only(settings, message):
+        await show_admin_home(message, state, store, settings)
+
+
 @router.callback_query(F.data == "admin:overview")
 async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: Settings):
     if not is_admin(settings, callback.from_user.id):
@@ -235,7 +262,7 @@ async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: 
                 f"{escape(display_batch(item['batch']))}\n{escape(item['message'][:70])}"
             )
         text = "\n".join(lines)
-    await callback.message.edit_text(text, reply_markup=admin_menu())
+    await callback.message.edit_text(text, reply_markup=None)
     await callback.answer()
 
 
@@ -253,7 +280,7 @@ async def admin_help(callback: CallbackQuery, settings: Settings):
         "Commands: /admin, /users, /broadcast, /schedule, "
         "/schedules, /cancel_schedule ID, /menu"
     )
-    await callback.message.edit_text(text, reply_markup=admin_menu())
+    await callback.message.edit_text(text, reply_markup=None)
     await callback.answer()
 
 
@@ -481,6 +508,7 @@ async def cancel(message: Message, state: FSMContext, settings: Settings, store:
         await message.answer("Your current action has been cancelled.", reply_markup=ReplyKeyboardRemove())
 
 
+@router.message(F.text == "❔ Help & Commands")
 @router.message(Command("help"))
 async def help_command(message: Message, settings: Settings):
     if admin_only(settings, message):
@@ -505,6 +533,8 @@ async def help_command(message: Message, settings: Settings):
         )
 
 
+@router.message(F.text == "👥 Members")
+@router.message(F.text == "👥 Members")
 @router.message(Command("users"))
 async def users_command(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
@@ -542,6 +572,7 @@ async def send_to_target(message: Message, store: MongoStore, target: str, text:
     return sent, failed, len(recipients)
 
 
+@router.message(F.text == "📣 New Announcement")
 @router.message(Command("broadcast"))
 async def broadcast(message: Message, state: FSMContext, settings: Settings):
     if not admin_only(settings, message):
@@ -562,6 +593,7 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
     )
 
 
+@router.message(F.text == "🗓 Schedule Announcement")
 @router.message(Command("schedule"))
 async def schedule_message(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
@@ -601,6 +633,7 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
     )
 
 
+@router.message(F.text == "📋 Scheduled Messages")
 @router.message(Command("schedules"))
 async def list_schedules(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
@@ -620,6 +653,7 @@ async def list_schedules(message: Message, store: MongoStore, settings: Settings
     await message.answer("\n\n".join(lines), reply_markup=admin_menu())
 
 
+@router.message(F.text == "🗑 Cancel Scheduled Message")
 @router.message(Command("cancel_schedule"))
 async def cancel_schedule(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
