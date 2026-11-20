@@ -5,6 +5,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemo
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from datetime import datetime
+from html import escape
 from sqlalchemy import select
 
 from loader import dp
@@ -80,6 +81,12 @@ async def cmd_start(message: types.Message, state: FSMContext):
             await session.commit()
             await session.refresh(user)
 
+        # Keep the configured super administrator privileged even if an
+        # older database row was created before the admin flag was set.
+        if user_id == SUPER_ADMIN_ID and not user.is_admin:
+            user.is_admin = True
+            await session.commit()
+
         # ───── ADMIN GREETING ─────
         if user.is_admin:
             greeting = "Welcome back, <b>Super Admin</b>!" if user_id == SUPER_ADMIN_ID else "Welcome back, <b>Admin</b>!"
@@ -102,7 +109,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
         if not user.gender:
             await message.answer(
-                f"Hi {user.full_name}! Please select your gender:",
+                f"Hi {escape(user.full_name)}! Please select your gender:",
                 reply_markup=create_gender_keyboard()
             )
             await state.set_state(RegisterStates.choosing_gender)
@@ -110,7 +117,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
         if not user.batch_id:
             await message.answer(
-                f"Hi {user.full_name}! Please select your batch:",
+                f"Hi {escape(user.full_name)}! Please select your batch:",
                 reply_markup=create_batch_keyboard()
             )
             await state.set_state(RegisterStates.choosing_batch)
@@ -123,8 +130,8 @@ async def cmd_start(message: types.Message, state: FSMContext):
         batch_name = batch_result.scalar_one()
 
         await message.answer(
-            f"Welcome back, <b>{user.full_name}</b>! 👋\n\n"
-            f"📚 Batch: <b>{batch_name}</b>\n"
+            f"Welcome back, <b>{escape(user.full_name)}</b>! 👋\n\n"
+            f"📚 Batch: <b>{escape(batch_name)}</b>\n"
             f"⚧ Gender: {user.gender}\n\n"
             "• /my_profile — View your profile\n"
             "• /edit_batch — Change batch",
@@ -139,7 +146,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 # ──────────────────────────────────────────────────────────────
 @dp.message(RegisterStates.entering_full_name)
 async def process_full_name(message: types.Message, state: FSMContext):
-    full_name = message.text.strip()
+    full_name = (message.text or "").strip()
 
     if len(full_name) < 2:
         await message.answer("Please enter a valid full name (at least 2 characters).")
@@ -160,7 +167,7 @@ async def process_full_name(message: types.Message, state: FSMContext):
         await session.commit()
 
     await message.answer(
-        f"Great, <b>{full_name}</b>! 👍\n\nNow, please select your gender:",
+        f"Great, <b>{escape(full_name)}</b>! 👍\n\nNow, please select your gender:",
         parse_mode="HTML",
         reply_markup=create_gender_keyboard()
     )
@@ -287,7 +294,7 @@ async def process_batch_selection(message: types.Message, state: FSMContext):
 
         await message.answer(
             f"🎉 <b>Registration Complete!</b>\n\n"
-            f"👤 Name: <b>{user.full_name}</b>\n"
+            f"👤 Name: <b>{escape(user.full_name or '')}</b>\n"
             f"⚧ Gender: {user.gender}\n"
             f"📚 Batch: <b>{batch.name}</b>\n\n"
             "You're all set! You'll now receive notifications for your batch.",
@@ -321,9 +328,9 @@ async def cmd_my_profile(message: types.Message):
 
         await message.answer(
             f"👤 <b>Your Profile</b>\n\n"
-            f"📛 Name: <b>{user.full_name or 'Not set'}</b>\n"
-            f"⚧ Gender: {user.gender or 'Not set'}\n"
-            f"📚 Batch: <b>{batch_name}</b>\n"
+            f"📛 Name: <b>{escape(user.full_name or 'Not set')}</b>\n"
+            f"⚧ Gender: {escape(user.gender or 'Not set')}\n"
+            f"📚 Batch: <b>{escape(batch_name)}</b>\n"
             f"📅 Joined: {user.join_date.strftime('%Y-%m-%d')}\n\n"
             "• /edit_batch — Change batch",
             parse_mode="HTML"
@@ -360,8 +367,8 @@ async def cmd_edit_profile(message: types.Message, state: FSMContext):
 
         await message.answer(
             "✏️ <b>Edit Profile</b>\n\n"
-            f"Current Name: <b>{user.full_name or 'Not set'}</b>\n"
-            f"Current Gender: {user.gender or 'Not set'}\n\n"
+            f"Current Name: <b>{escape(user.full_name or 'Not set')}</b>\n"
+            f"Current Gender: {escape(user.gender or 'Not set')}\n\n"
             "What would you like to edit?",
             reply_markup=keyboard,
             parse_mode="HTML"
@@ -403,7 +410,7 @@ async def handle_edit_cancel(callback: types.CallbackQuery, state: FSMContext):
 # Process new name input
 @dp.message(EditProfileStates.entering_new_name)
 async def process_new_name(message: types.Message, state: FSMContext):
-    new_name = message.text.strip()
+    new_name = (message.text or "").strip()
 
     if len(new_name) < 2:
         await message.answer("Please enter a valid full name (at least 2 characters).")
