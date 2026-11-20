@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import select
 
 from config import SUPER_ADMIN_ID
-from db.models import Schedule, User
+from db.models import Schedule, User, ScheduleType
 from db.session import AsyncSessionLocal
 from db.permissions import is_admin_user
 
@@ -87,6 +87,11 @@ async def save_schedule(data: dict, admin_id: int) -> Schedule | None:
                 caption=caption,
                 type=data["schedule_type"],
                 next_run=data["next_run"],
+                monthly_day=(
+                    data["next_run"].day
+                    if data["schedule_type"] == ScheduleType.MONTHLY
+                    else None
+                ),
                 admin_id=admin_id,
                 is_active=True,
             )
