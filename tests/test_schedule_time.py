@@ -39,6 +39,19 @@ class ScheduleTimeTests(unittest.TestCase):
             datetime(2026, 3, 31, 9, 0),
         )
 
+    def test_monthly_anchor_prevents_drift_after_february(self):
+        scheduled = datetime(2026, 2, 28, 9, 0)
+        now = datetime(2026, 3, 1, 0, 0)
+        self.assertEqual(
+            calculate_next_run(
+                ScheduleType.MONTHLY,
+                scheduled,
+                now,
+                monthly_day=31,
+            ),
+            datetime(2026, 3, 31, 9, 0),
+        )
+
     def test_custom_cron_returns_next_future_occurrence(self):
         scheduled = datetime(2026, 11, 20, 8, 0)
         now = datetime(2026, 11, 20, 10, 0)
