@@ -31,6 +31,7 @@ def upgrade() -> None:
     # The original migration incorrectly declared it as an FK to users.id.
     bind = op.get_bind()
     inspector = sa.inspect(bind)
+    admin_id_was_foreign_key = False
     for foreign_key in inspector.get_foreign_keys("schedules"):
         if foreign_key.get("constrained_columns") == ["admin_id"]:
             op.drop_constraint(
@@ -38,18 +39,20 @@ def upgrade() -> None:
                 "schedules",
                 type_="foreignkey",
             )
+            admin_id_was_foreign_key = True
 
-    # Existing rows were constrained to users.id by the original migration.
-    # Convert those legacy internal IDs to Telegram IDs before using the column
-    # according to the current model. Rows without a matching user are retained.
-    op.execute(
-        sa.text(
-            "UPDATE schedules AS s "
-            "SET admin_id = u.user_id "
-            "FROM users AS u "
-            "WHERE s.admin_id = u.id"
+    # Existing rows constrained by the original FK stored users.id. Convert
+    # those values to Telegram IDs. If no FK existed, leave existing values
+    # untouched because they may already be Telegram IDs.
+    if admin_id_was_foreign_key:
+        op.execute(
+            sa.text(
+                "UPDATE schedules AS s "
+                "SET admin_id = u.user_id "
+                "FROM users AS u "
+                "WHERE s.admin_id = u.id"
+            )
         )
-    )
 
 
 def downgrade() -> None:
