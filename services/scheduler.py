@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import logging
 import time
 from datetime import datetime, timedelta
@@ -83,6 +84,7 @@ class BroadcastManager:
         self.running = False
         self.total_enqueued = 0
         self.total_sent = 0
+        self.total_failed = 0
 
     def start(self):
         """Start the worker pool."""
@@ -113,6 +115,7 @@ class BroadcastManager:
         except asyncio.QueueFull:
             logger.warning("Broadcast queue FULL! Waiting to enqueue...")
             await self.queue.put((user_id, message, sched_id, full_name, media_type, media_file_id))
+            self.total_enqueued += 1
 
     async def _worker(self, worker_id: int):
         """Process queued messages and always acknowledge each dequeued item."""
@@ -141,6 +144,8 @@ class BroadcastManager:
 
                 if success:
                     self.total_sent += 1
+                else:
+                    self.total_failed += 1
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -219,6 +224,9 @@ class BroadcastManager:
                         caption=caption,
                         parse_mode="HTML"
                     )
+                else:
+                    logger.error("Unsupported broadcast media type: %s", media_type)
+                    return False
                 return True
 
             except TelegramRetryAfter as e:
@@ -303,27 +311,38 @@ async def execute_schedule_logic(bot: Bot, sched_id: int):
             # restart (at-least-once delivery; a small duplicate window remains).
             await broadcast_manager.queue.join()
 
-            # 3. Calculate Next Run
+            # 3. Calculate the next occurrence without drifting the original
+            # scheduled time. Skip occurrences missed while the process was down.
             now = datetime.utcnow()
             next_run = None
-            
+            scheduled_at = sched.next_run or now
+
             if sched.type == ScheduleType.CUSTOM and sched.cron_expr:
                 try:
                     cron = croniter.croniter(sched.cron_expr, now)
                     next_run = cron.get_next(datetime)
-                except Exception as e:
-                    logger.error(f"Cron error: {e}")
+                except Exception:
+                    logger.exception("Invalid cron expression for schedule #%s", sched.id)
             elif sched.type == ScheduleType.WEEKLY:
-                next_run = now + timedelta(weeks=1)
+                next_run = scheduled_at + timedelta(weeks=1)
+                while next_run <= now:
+                    next_run += timedelta(weeks=1)
             elif sched.type == ScheduleType.MONTHLY:
-                # Simple monthly logic
-                next_run = now + timedelta(days=30) # Fallback
-                try:
-                    new_month = (now.month % 12) + 1
-                    year_add = 1 if new_month == 1 else 0
-                    next_run = now.replace(year=now.year + year_add, month=new_month)
-                except ValueError:
-                    pass
+                year = scheduled_at.year
+                month = scheduled_at.month + 1
+                if month > 12:
+                    month = 1
+                    year += 1
+                day = min(scheduled_at.day, calendar.monthrange(year, month)[1])
+                next_run = scheduled_at.replace(year=year, month=month, day=day)
+                while next_run <= now:
+                    year = next_run.year
+                    month = next_run.month + 1
+                    if month > 12:
+                        month = 1
+                        year += 1
+                    day = min(scheduled_at.day, calendar.monthrange(year, month)[1])
+                    next_run = scheduled_at.replace(year=year, month=month, day=day)
 
             # 4. Update DB
             values = {}
