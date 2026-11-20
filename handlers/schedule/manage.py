@@ -172,7 +172,7 @@ async def handle_view_schedule(callback: types.CallbackQuery, state: FSMContext)
         return
 
     status = "🟢 Active" if sched.is_active else "⏸️ Paused"
-    batches = ", ".join(b.name for b in sched.batches) if sched.batches else "None"
+    batches = ", ".join(escape(b.name) for b in sched.batches) if sched.batches else "None"
     next_run_str = format_12hour(sched.next_run) if sched.next_run else "Not scheduled"
     cron_info = f"\n🔄 <b>Cron:</b> <code>{escape(sched.cron_expr)}</code>" if sched.cron_expr else ""
     
@@ -322,9 +322,9 @@ async def handle_toggle_schedule(callback: types.CallbackQuery, state: FSMContex
     
     # Refresh the view
     status = "🟢 Active" if sched.is_active else "⏸️ Paused"
-    batches = ", ".join(b.name for b in sched.batches) if sched.batches else "None"
+    batches = ", ".join(escape(b.name) for b in sched.batches) if sched.batches else "None"
     next_run_str = format_12hour(sched.next_run) if sched.next_run else "Not scheduled"
-    cron_info = f"\n🔄 <b>Cron:</b> <code>{sched.cron_expr}</code>" if sched.cron_expr else ""
+    cron_info = f"\n🔄 <b>Cron:</b> <code>{escape(sched.cron_expr)}</code>" if sched.cron_expr else ""
     
     # Handle both text and media schedules
     if sched.media_type:
