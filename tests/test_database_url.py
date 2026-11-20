@@ -21,6 +21,14 @@ class DatabaseUrlTests(unittest.TestCase):
         url = "postgresql+asyncpg://user:pass@host/db"
         self.assertEqual(normalize_async_database_url(url), url)
 
+    def test_sslmode_is_converted_for_asyncpg(self):
+        self.assertEqual(
+            normalize_async_database_url(
+                "postgresql://user:pass@host/db?sslmode=require&application_name=bot"
+            ),
+            "postgresql+asyncpg://user:pass@host/db?application_name=bot&ssl=require",
+        )
+
     def test_empty_url_is_rejected(self):
         with self.assertRaises(ValueError):
             normalize_async_database_url("")
