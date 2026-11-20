@@ -93,11 +93,14 @@ class BroadcastManager:
         logger.info(f"BroadcastManager STARTED with {WORKER_COUNT} workers.")
 
     async def stop(self):
-        """Gracefully stop workers (wait for queue to empty? No, hard stop for now)."""
+        """Drain accepted jobs before stopping the worker pool."""
+        if not self.running:
+            return
+        await self.queue.join()
         self.running = False
-        # In a real shutdown, we might wait for join(), but for bot reload we just cancel
-        for w in self.workers:
-            w.cancel()
+        for worker in self.workers:
+            worker.cancel()
+        await asyncio.gather(*self.workers, return_exceptions=True)
         logger.info("BroadcastManager STOPPED.")
 
     async def enqueue_job(self, user_id: int, message: str, sched_id: int, full_name: str = None, media_type: str = None, media_file_id: str = None):
@@ -112,41 +115,38 @@ class BroadcastManager:
             await self.queue.put((user_id, message, sched_id, full_name, media_type, media_file_id))
 
     async def _worker(self, worker_id: int):
-        """Worker loop processing messages from queue."""
+        """Process queued messages and always acknowledge each dequeued item."""
         while self.running:
             try:
-                user_id, text, sched_id, full_name, media_type, media_file_id = await self.queue.get()
-                
-                # Debug logging
-                logger.info(f"Worker {worker_id}: user_id={user_id}, full_name={full_name}, media_type={media_type}")
-                
-                # Personalize caption/message if full_name provided
-                if full_name and text:
-                    text = personalize_message(text, full_name)
-                    logger.info(f"Worker {worker_id}: Personalized message for {user_id}")
-                elif full_name and not text:
-                    # Media without caption - create greeting
-                    text = f"ሰላም {full_name}"
-                
-                # Enforce Rate Limit
-                await self.limiter.acquire()
-                
-                # Send based on media type (text is already personalized)
-                if media_type:
-                    success = await self._send_media(user_id, media_type, media_file_id, text)
-                else:
-                    success = await self._send_safe(user_id, text)
-                
-                if success:
-                    self.total_sent += 1
-                
-                self.queue.task_done()
-                
+                job = await self.queue.get()
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error(f"Worker {worker_id} crash: {e}", exc_info=True)
-                await asyncio.sleep(1) # Prevent tight loop crash
+
+            try:
+                user_id, text, sched_id, full_name, media_type, media_file_id = job
+
+                if full_name and text:
+                    text = personalize_message(text, full_name)
+                elif full_name and not text:
+                    from html import escape
+                    text = f"ሰላም {escape(full_name)}"
+
+                await self.limiter.acquire()
+                if media_type:
+                    success = await self._send_media(
+                        user_id, media_type, media_file_id, text
+                    )
+                else:
+                    success = await self._send_safe(user_id, text)
+
+                if success:
+                    self.total_sent += 1
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Broadcast worker %s failed to process a job", worker_id)
+            finally:
+                self.queue.task_done()
 
     async def _send_safe(self, user_id: int, text: str) -> bool:
         """Robust send with retry logic."""
@@ -296,6 +296,11 @@ async def execute_schedule_logic(bot: Bot, sched_id: int):
                         sched.media_type,
                         sched.media_file_id
                     )
+
+            # Keep the schedule due until all accepted deliveries finish. If the
+            # process crashes before this point, the due schedule is retried on
+            # restart (at-least-once delivery; a small duplicate window remains).
+            await broadcast_manager.queue.join()
 
             # 3. Calculate Next Run
             now = datetime.utcnow()
