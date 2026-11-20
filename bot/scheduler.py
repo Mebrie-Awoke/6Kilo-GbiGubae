@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 
 from bot.config import Settings
+from bot.messaging import personalize_announcement
 from bot.storage import MongoStore
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,11 @@ async def deliver_due_messages(bot, store: MongoStore, settings: Settings, lease
             if user_id in already_handled:
                 continue
             try:
-                await bot.send_message(user_id, schedule["message"], parse_mode=None)
+                await bot.send_message(
+                    user_id,
+                    personalize_announcement(recipient.get("name"), schedule["message"]),
+                    parse_mode=None,
+                )
                 await store.record_delivery(schedule["id"], user_id, success=True)
                 await asyncio.sleep(0.05)
             except (TelegramForbiddenError, TelegramBadRequest) as exc:
