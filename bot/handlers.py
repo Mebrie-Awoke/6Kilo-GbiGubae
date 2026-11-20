@@ -201,7 +201,7 @@ async def admin_schedules(callback: CallbackQuery, store: JsonStore, settings: S
         for item in schedules[:15]:
             when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
             lines.append(
-                f"#{item['id']} · {{format_ethiopian(when, ZoneInfo(settings.timezone))}} · "
+                f"#{item['id']} · {format_ethiopian(when, ZoneInfo(settings.timezone))} · "
                 f"{escape(item['batch'])}\n{escape(item['message'][:70])}"
             )
         text = "\n".join(lines)
@@ -574,7 +574,7 @@ async def list_schedules(message: Message, store: JsonStore, settings: Settings)
     for item in schedules[:30]:
         when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
         lines.append(
-            f"#{item['id']} · {when:%d %b %Y, %H:%M} · {escape(item['batch'])}\n"
+            f"#{item['id']} · {format_ethiopian(when, ZoneInfo(settings.timezone))} · {escape(item['batch'])}\n"
             f"{escape(item['message'][:80])}"
         )
     await message.answer("\n\n".join(lines), reply_markup=admin_menu())
