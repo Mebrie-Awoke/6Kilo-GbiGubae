@@ -86,7 +86,7 @@ def confirmation_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-async def show_admin_home(message: Message, state: FSMContext, store: JsonStore) -> None:
+async def show_admin_home(message: Message, state: FSMContext, store: JsonStore, settings: Settings) -> None:
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await message.answer(
@@ -122,7 +122,7 @@ async def start_registration(message: Message, state: FSMContext) -> None:
 async def start(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
     user_id = message.from_user.id
     if is_admin(settings, user_id):
-        await show_admin_home(message, state, store)
+        await show_admin_home(message, state, store, settings)
         return
     user = await store.get_user(user_id)
     if user:
@@ -136,13 +136,13 @@ async def admin_home(message: Message, state: FSMContext, store: JsonStore, sett
     if not admin_only(settings, message):
         await message.answer("⛔ This workspace is restricted to administrators.")
         return
-    await show_admin_home(message, state, store)
+    await show_admin_home(message, state, store, settings)
 
 
 @router.message(Command("menu"))
 async def menu_command(message: Message, state: FSMContext, store: JsonStore, settings: Settings):
     if admin_only(settings, message):
-        await show_admin_home(message, state, store)
+        await show_admin_home(message, state, store, settings)
         return
     user = await store.get_user(message.from_user.id)
     if not user:
@@ -156,7 +156,7 @@ async def admin_overview(callback: CallbackQuery, store: JsonStore, settings: Se
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("Not authorized.", show_alert=True)
         return
-    users = await store.list_users()
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
     for user in users:
         if user.get("batch") in counts:
@@ -173,7 +173,7 @@ async def admin_members(callback: CallbackQuery, store: JsonStore, settings: Set
     if not is_admin(settings, callback.from_user.id):
         await callback.answer("Not authorized.", show_alert=True)
         return
-    users = await store.list_users()
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
     for user in users:
         if user.get("batch") in counts:
@@ -335,7 +335,7 @@ async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings:
         await callback.answer("Not authorized.", show_alert=True)
         return
     await state.clear()
-    users = await store.list_users()
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await callback.message.edit_text(
         f"🛡 <b>Admin workspace</b>\nRegistered members: <b>{len(users)}</b>",
         reply_markup=admin_menu(),
@@ -440,7 +440,7 @@ async def edit_batch(message: Message, state: FSMContext, store: JsonStore, sett
 async def cancel(message: Message, state: FSMContext, settings: Settings, store: JsonStore):
     await state.clear()
     if admin_only(settings, message):
-        await show_admin_home(message, state, store)
+        await show_admin_home(message, state, store, settings)
     else:
         await message.answer("Action cancelled.", reply_markup=ReplyKeyboardRemove())
 
@@ -474,7 +474,7 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
     if not admin_only(settings, message):
         await message.answer("⛔ This command is restricted to administrators.")
         return
-    users = await store.list_users()
+    users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
     for user in users:
         if user.get("batch") in counts:
@@ -486,7 +486,10 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
 
 
 async def send_to_target(message: Message, store: JsonStore, target: str, text: str, settings: Settings) -> tuple[int, int, int]:
-    recipients = [\n        user for user in await store.list_users(None if target.lower() == "all" else target)\n        if user["telegram_id"] != settings.super_admin_id\n    ]
+    recipients = [
+        user for user in await store.list_users(None if target.lower() == "all" else target)
+        if user["telegram_id"] != settings.super_admin_id
+    ]
     sent = failed = 0
     for recipient in recipients:
         try:
