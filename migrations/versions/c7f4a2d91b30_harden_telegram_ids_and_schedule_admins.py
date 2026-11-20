@@ -39,6 +39,18 @@ def upgrade() -> None:
                 type_="foreignkey",
             )
 
+    # Existing rows were constrained to users.id by the original migration.
+    # Convert those legacy internal IDs to Telegram IDs before using the column
+    # according to the current model. Rows without a matching user are retained.
+    op.execute(
+        sa.text(
+            "UPDATE schedules AS s "
+            "SET admin_id = u.user_id "
+            "FROM users AS u "
+            "WHERE s.admin_id = u.id"
+        )
+    )
+
 
 def downgrade() -> None:
     # The old FK is intentionally not recreated: admin_id contains Telegram
