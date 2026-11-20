@@ -315,7 +315,7 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: J
         await callback.answer("Announcement details are incomplete. Start again.", show_alert=True)
         return
     await callback.message.edit_text("⏳ <b>Sending announcement…</b>")
-    sent, failed, total = await send_to_target(callback.message, store, target, text)
+    sent, failed, total = await send_to_target(callback.message, store, target, text, settings)
     await state.clear()
     await callback.message.edit_text(
         "📬 <b>Delivery report</b>\n"
@@ -485,8 +485,8 @@ async def users_command(message: Message, store: JsonStore, settings: Settings):
     await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
-async def send_to_target(message: Message, store: JsonStore, target: str, text: str) -> tuple[int, int, int]:
-    recipients = [\n        user for user in await store.list_users(None if target.lower() == "all" else target)\n        if user["telegram_id"] != message.bot.id\n    ]
+async def send_to_target(message: Message, store: JsonStore, target: str, text: str, settings: Settings) -> tuple[int, int, int]:
+    recipients = [\n        user for user in await store.list_users(None if target.lower() == "all" else target)\n        if user["telegram_id"] != settings.super_admin_id\n    ]
     sent = failed = 0
     for recipient in recipients:
         try:
