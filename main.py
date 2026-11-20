@@ -49,6 +49,41 @@ async def configure_commands(bot: Bot, admin_id: int) -> None:
     ], scope=BotCommandScopeChat(chat_id=admin_id))
 
 
+async def telegram_runtime(bot: Bot, dp: Dispatcher, settings) -> None:
+    """Configure Telegram in the background so temporary API outages do not stop the web service."""
+    while True:
+        try:
+            if settings.webhook_base_url:
+                await bot.set_webhook(
+                    url=f"{settings.webhook_base_url}{WEBHOOK_PATH}",
+                    secret_token=settings.webhook_secret,
+                    allowed_updates=dp.resolve_used_update_types(),
+                    drop_pending_updates=False,
+                )
+                logger.info("Telegram webhook configured.")
+            else:
+                await bot.delete_webhook(drop_pending_updates=False)
+                logger.info("Telegram polling started.")
+                await dp.start_polling(bot)
+                return
+
+            try:
+                await configure_commands(bot, settings.super_admin_id)
+                logger.info("Telegram command menu configured.")
+            except Exception:
+                logger.exception(
+                    "Could not configure Telegram command menu; bot service will continue."
+                )
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception(
+                "Telegram setup failed; retrying in 30 seconds. Web service remains available."
+            )
+            await asyncio.sleep(30)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = load_settings()
@@ -70,28 +105,14 @@ async def lifespan(app: FastAPI):
     app.state.dispatcher = dp
 
     scheduler_task = asyncio.create_task(scheduler_loop(bot, store, settings))
-    polling_task = None
+    telegram_task = asyncio.create_task(telegram_runtime(bot, dp, settings))
     try:
-        await configure_commands(bot, settings.super_admin_id)
-        if settings.webhook_base_url:
-            await bot.set_webhook(
-                url=f"{settings.webhook_base_url}{WEBHOOK_PATH}",
-                secret_token=settings.webhook_secret,
-                allowed_updates=dp.resolve_used_update_types(),
-                drop_pending_updates=False,
-            )
-            logger.info("Telegram webhook configured.")
-        else:
-            await bot.delete_webhook(drop_pending_updates=False)
-            polling_task = asyncio.create_task(dp.start_polling(bot))
-            logger.info("Telegram polling started.")
+        logger.info("Application startup complete; Telegram setup is running in the background.")
         yield
     finally:
-        if polling_task:
-            polling_task.cancel()
-            await asyncio.gather(polling_task, return_exceptions=True)
-        scheduler_task.cancel()
-        await asyncio.gather(scheduler_task, return_exceptions=True)
+        for task in (telegram_task, scheduler_task):
+            task.cancel()
+        await asyncio.gather(telegram_task, scheduler_task, return_exceptions=True)
         # Keep the webhook registered during Render restarts and deployments.
         # Telegram will retry pending updates while the new instance starts.
         await bot.session.close()
