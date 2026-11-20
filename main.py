@@ -43,6 +43,9 @@ async def configure_commands(bot: Bot, admin_id: int) -> None:
         BotCommand(command="cancel_schedule", description="መርሐግብር ይሰርዙ"),
         BotCommand(command="help", description="ትዕዛዞችን ይመልከቱ"),
         BotCommand(command="cancel", description="አሁን ያለውን ሂደት ያቋርጡ"),
+        BotCommand(command="add_admin", description="Grant administrator access (super admin)"),
+        BotCommand(command="remove_admin", description="Revoke administrator access (super admin)"),
+        BotCommand(command="admins", description="List additional administrators (super admin)"),
     ], scope=BotCommandScopeChat(chat_id=admin_id))
 
 
