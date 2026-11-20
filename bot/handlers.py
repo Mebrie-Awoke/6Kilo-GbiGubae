@@ -955,18 +955,144 @@ async def list_schedules(message: Message, store: MongoStore, settings: Settings
     await message.answer("\n\n".join(lines), reply_markup=admin_menu())
 
 
+def cancel_schedule_keyboard(schedules: list[dict], page: int = 0) -> InlineKeyboardMarkup:
+    page_size = 8
+    start = page * page_size
+    page_items = schedules[start:start + page_size]
+    rows = []
+    for item in page_items:
+        label = f"#{item['id']} · {display_batch(item['batch'])}"
+        rows.append([InlineKeyboardButton(
+            text=label[:60],
+            callback_data=f"schedule:cancel:{item['id']}",
+        )])
+    navigation = []
+    if page > 0:
+        navigation.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"schedule:cancel_page:{page - 1}"))
+    if start + page_size < len(schedules):
+        navigation.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"schedule:cancel_page:{page + 1}"))
+    if navigation:
+        rows.append(navigation)
+    rows.append([InlineKeyboardButton(text="✖ Close", callback_data="schedule:cancel_close")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def show_cancel_schedules(message: Message, store: MongoStore, settings: Settings, page: int = 0) -> None:
+    schedules = await store.list_schedules()
+    if not schedules:
+        await message.answer("🗑 <b>Cancel Scheduled Announcement</b>\n\nThere are no pending announcements to cancel.")
+        return
+    page_size = 8
+    page = max(0, min(page, (len(schedules) - 1) // page_size))
+    lines = [
+        "🗑 <b>Cancel Scheduled Announcement</b>",
+        "━━━━━━━━━━━━━━━━━━",
+        f"Select an announcement to cancel · {page + 1}/{(len(schedules) + page_size - 1) // page_size}",
+        "",
+    ]
+    for item in schedules[page * page_size:(page + 1) * page_size]:
+        when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
+        lines.append(
+            f"<b>#{item['id']} · {escape(display_batch(item['batch']))}</b>\n"
+            f"🕒 {format_ethiopian(when, ZoneInfo(settings.timezone))}\n"
+            f"{escape(item['message'][:90])}"
+        )
+    await message.answer(
+        "\n\n".join(lines),
+        reply_markup=cancel_schedule_keyboard(schedules, page),
+    )
+
+
 @router.message(F.text == "🗑 Cancel Scheduled Message")
+async def cancel_schedule_menu(message: Message, store: MongoStore, settings: Settings):
+    if not await admin_only(settings, message, store):
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
+        return
+    await show_cancel_schedules(message, store, settings)
+
+
 @router.message(Command("cancel_schedule"))
 async def cancel_schedule(message: Message, store: MongoStore, settings: Settings):
     if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
+    payload = command_payload(message)
+    if not payload:
+        await show_cancel_schedules(message, store, settings)
+        return
     try:
-        schedule_id = int(command_payload(message))
+        schedule_id = int(payload)
     except ValueError:
-        await message.answer("Usage: /cancel_schedule ID")
+        await message.answer("Usage: /cancel_schedule [ID]. Without an ID, choose an announcement from the list.")
         return
     if await store.cancel_schedule(schedule_id):
         await message.answer(f"✅ Schedule #{schedule_id} has been cancelled.")
     else:
         await message.answer("No pending announcement was found with that ID.")
+
+
+@router.callback_query(F.data.startswith("schedule:cancel_page:"))
+async def cancel_schedule_page(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not await is_admin(settings, store, callback.from_user.id):
+        await callback.answer("Access denied.", show_alert=True)
+        return
+    try:
+        page = int(callback.data.rsplit(":", 1)[1])
+    except ValueError:
+        await callback.answer("Invalid page.", show_alert=True)
+        return
+    schedules = await store.list_schedules()
+    if not schedules:
+        await callback.message.edit_text("There are no pending announcements to cancel.")
+        await callback.answer()
+        return
+    page_size = 8
+    page = max(0, min(page, (len(schedules) - 1) // page_size))
+    lines = [
+        "🗑 <b>Cancel Scheduled Announcement</b>",
+        "━━━━━━━━━━━━━━━━━━",
+        f"Select an announcement to cancel · {page + 1}/{(len(schedules) + page_size - 1) // page_size}",
+        "",
+    ]
+    for item in schedules[page * page_size:(page + 1) * page_size]:
+        when = datetime.fromisoformat(item["send_at"]).astimezone(ZoneInfo(settings.timezone))
+        lines.append(
+            f"<b>#{item['id']} · {escape(display_batch(item['batch']))}</b>\n"
+            f"🕒 {format_ethiopian(when, ZoneInfo(settings.timezone))}\n"
+            f"{escape(item['message'][:90])}"
+        )
+    await callback.message.edit_text(
+        "\n\n".join(lines),
+        reply_markup=cancel_schedule_keyboard(schedules, page),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("schedule:cancel:"))
+async def cancel_selected_schedule(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not await is_admin(settings, store, callback.from_user.id):
+        await callback.answer("Access denied.", show_alert=True)
+        return
+    try:
+        schedule_id = int(callback.data.rsplit(":", 1)[1])
+    except ValueError:
+        await callback.answer("Invalid schedule.", show_alert=True)
+        return
+    if await store.cancel_schedule(schedule_id):
+        await callback.answer("Announcement cancelled.")
+        await callback.message.edit_text(
+            f"✅ <b>Scheduled announcement #{schedule_id} cancelled.</b>\n\n"
+            "It will no longer be delivered."
+        )
+    else:
+        await callback.answer("This announcement is no longer pending.", show_alert=True)
+        await show_cancel_schedules(callback.message, store, settings)
+
+
+@router.callback_query(F.data == "schedule:cancel_close")
+async def close_cancel_schedule_menu(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not await is_admin(settings, store, callback.from_user.id):
+        await callback.answer("Access denied.", show_alert=True)
+        return
+    await callback.message.edit_text("🗑 Scheduled-announcement cancellation menu closed.")
+    await callback.answer()
