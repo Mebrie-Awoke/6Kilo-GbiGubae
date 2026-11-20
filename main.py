@@ -49,7 +49,7 @@ async def telegram_webhook(request: web.Request) -> web.Response:
     try:
         payload = await request.json()
         await persist_telegram_update(payload)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, web.HTTPException):
         logger.warning("Rejected invalid Telegram webhook payload")
         return web.json_response({"ok": False, "error": "invalid update"}, status=400)
     except Exception:
