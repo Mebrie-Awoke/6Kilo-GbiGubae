@@ -289,7 +289,7 @@ async def admin_help(callback: CallbackQuery, settings: Settings, store: MongoSt
 
 
 @router.callback_query(F.data == "admin:broadcast")
-async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
+async def begin_broadcast(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
@@ -303,7 +303,7 @@ async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: 
 
 
 @router.callback_query(F.data.startswith("broadcast:target:"))
-async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, settings: Settings):
+async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
@@ -351,7 +351,7 @@ async def compose_broadcast(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "broadcast:edit")
-async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
+async def edit_broadcast(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
     if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
@@ -876,7 +876,7 @@ async def send_to_target(message: Message, store: MongoStore, target: str, text:
 
 @router.message(F.text == "📣 New Announcement")
 @router.message(Command("broadcast"))
-async def broadcast(message: Message, state: FSMContext, settings: Settings):
+async def broadcast(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
