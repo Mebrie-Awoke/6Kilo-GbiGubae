@@ -28,14 +28,8 @@ DATABASE_URL = (
 )
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-if not WEBHOOK_SECRET:
-    raise RuntimeError("WEBHOOK_SECRET is required for Telegram webhook verification.")
-
 WEBHOOK_BASE_URL = (
     os.getenv("WEBHOOK_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
 )
-if not WEBHOOK_BASE_URL:
-    raise RuntimeError(
-        "WEBHOOK_BASE_URL or Render's RENDER_EXTERNAL_URL must be configured."
-    )
-WEBHOOK_BASE_URL = WEBHOOK_BASE_URL.rstrip("/")
+if WEBHOOK_BASE_URL:
+    WEBHOOK_BASE_URL = WEBHOOK_BASE_URL.rstrip("/")
