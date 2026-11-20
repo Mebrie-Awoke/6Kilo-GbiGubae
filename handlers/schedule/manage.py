@@ -15,6 +15,7 @@ from keyboard.inline import (
 )
 from .helpers import ensure_user_exists, format_12hour
 import logging
+from html import escape
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ async def cmd_list_schedules(message: types.Message):
     lines = []
     for s in schedules:
         status = "✅" if s.is_active else "⏸️"
-        batches = ", ".join(b.name for b in s.batches) if s.batches else "None"
+        batches = ", ".join(escape(b.name) for b in s.batches) if s.batches else "None"
         
         # Handle both text and media schedules
         if s.media_type:
@@ -65,7 +66,7 @@ async def cmd_list_schedules(message: types.Message):
         else:
             content = (s.message or "(empty)")[:40]
         
-        msg_preview = content.replace("\n", " ")
+        msg_preview = escape(content.replace("\n", " "))
         if len(content) > 40:
             msg_preview += "..."
         
@@ -173,14 +174,14 @@ async def handle_view_schedule(callback: types.CallbackQuery, state: FSMContext)
     status = "🟢 Active" if sched.is_active else "⏸️ Paused"
     batches = ", ".join(b.name for b in sched.batches) if sched.batches else "None"
     next_run_str = format_12hour(sched.next_run) if sched.next_run else "Not scheduled"
-    cron_info = f"\n🔄 <b>Cron:</b> <code>{sched.cron_expr}</code>" if sched.cron_expr else ""
+    cron_info = f"\n🔄 <b>Cron:</b> <code>{escape(sched.cron_expr)}</code>" if sched.cron_expr else ""
     
     # Handle both text and media schedules
     if sched.media_type:
         media_icon = {"photo": "📷", "video": "🎥", "document": "📄"}.get(sched.media_type, "📎")
         if sched.caption:
             content = sched.caption
-            msg_preview = content[:200] + "..." if len(content) > 200 else content
+            msg_preview = escape(content[:200] + "..." if len(content) > 200 else content)
         else:
             msg_preview = f"{media_icon} (no caption)"
         content_label = "Caption Preview"
