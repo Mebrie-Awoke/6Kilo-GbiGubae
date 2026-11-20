@@ -605,7 +605,7 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
             "Format: /schedule YYYY-MM-DD HH:MM | batch | message (Ethiopian calendar)\n"
             "Use 'all' to target every registered member.\n"
             "Example: /schedule 2019-03-13 09:00 | 1st Year | Class starts at 9 AM\n"
-            "ወራት: መስከረም፣ ጥቅምት፣ ኅዳር፣ ታኅሣሥ፣ ጥር፣ የካቲት፣ መጋቢት፣ ሚያዝያ፣ ግንቦት፣ ሰኔ፣ ሐምሌ፣ ነሐሴ፣ ጳጉሜ።"
+
         )
         return
     time_text, target, text = parts
