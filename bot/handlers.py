@@ -284,7 +284,7 @@ async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, se
     await state.update_data(target=target, target_label=label)
     await state.set_state(AdminBroadcast.entering_message)
     await callback.message.edit_text(
-        f"📣 <b>አዲስ ማስታወቂያ</b>\nተቀባዮች: <b>{escape(label)}</b>\n\n"
+        f"📣 <b>New Announcement</b>\nAudience: <b>{escape(label)}</b>\n\n"
         "Step 2 of 2 — Send the announcement text in your next message.\n"
         "You can send up to 4,096 characters. Use /cancel to stop."
     )
@@ -319,7 +319,7 @@ async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: S
         await callback.answer("This announcement session has expired.", show_alert=True)
         return
     await state.set_state(AdminBroadcast.entering_message)
-    await callback.message.edit_text("✏️ የተስተካከለውን የማስታወቂያ ጽሑፍ ይላኩ። ለማቋረጥ /cancel ይጠቀሙ።")
+    await callback.message.edit_text("✏️ Send the revised announcement text. Use /cancel to stop.")
     await callback.answer()
 
 
@@ -349,7 +349,7 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: M
         f"Failed: <b>{failed}</b>",
         reply_markup=admin_menu(),
     )
-    await callback.answer("የማስታወቂያ ሂደቱ ተጠናቋል።")
+    await callback.answer("Announcement workflow completed.")
 
 
 @router.callback_query(F.data == "broadcast:cancel")
@@ -360,7 +360,7 @@ async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings:
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     await callback.message.edit_text(
-        f"🛡 <b>የአስተዳዳሪ ማዕከል</b>\nየተመዘገቡ አባላት: <b>{len(users)}</b>",
+        f"🛡 <b>Admin Workspace</b>\nRegistered members: <b>{len(users)}</b>",
         reply_markup=admin_menu(),
     )
     await callback.answer("Announcement cancelled.")
@@ -373,7 +373,7 @@ async def member_profile(callback: CallbackQuery, store: MongoStore):
         await callback.answer("Please complete registration first using /start.", show_alert=True)
         return
     await callback.message.answer(
-        f"👤 <b>የእርስዎ የአባልነት መረጃ</b>\n\n"
+        f"👤 <b>Your Membership Profile</b>\n\n"
         f"Name: {escape(user['name'])}\nAcademic year: {escape(user['batch'])}"
     )
     await callback.answer()
@@ -499,14 +499,14 @@ async def help_command(message: Message, settings: Settings):
 @router.message(Command("users"))
 async def users_command(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
     for user in users:
         if user.get("batch") in counts:
             counts[user["batch"]] += 1
-    lines = ["👥 <b>የአባላት ሪፖርት</b>", "━━━━━━━━━━━━━━━━━━",
+    lines = ["👥 <b>Member Report</b>", "━━━━━━━━━━━━━━━━━━",
              f"Total registered: <b>{len(users)}</b>", ""]
     lines.extend(f"• {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items())
     await message.answer("\n".join(lines), reply_markup=admin_menu())
@@ -532,7 +532,7 @@ async def send_to_target(message: Message, store: MongoStore, target: str, text:
 @router.message(Command("broadcast"))
 async def broadcast(message: Message, state: FSMContext, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     payload = command_payload(message)
     if payload:
@@ -552,7 +552,7 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
 @router.message(Command("schedule"))
 async def schedule_message(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     parts = [part.strip() for part in command_payload(message).split("|", 2)]
     if len(parts) != 3:
@@ -589,7 +589,7 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
 @router.message(Command("schedules"))
 async def list_schedules(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     schedules = await store.list_schedules()
     if not schedules:
@@ -608,7 +608,7 @@ async def list_schedules(message: Message, store: MongoStore, settings: Settings
 @router.message(Command("cancel_schedule"))
 async def cancel_schedule(message: Message, store: MongoStore, settings: Settings):
     if not admin_only(settings, message):
-        await message.answer("⛔ ይህ ትዕዛዝ ለአስተዳዳሪዎች ብቻ የተፈቀደ ነው።")
+        await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     try:
         schedule_id = int(command_payload(message))
