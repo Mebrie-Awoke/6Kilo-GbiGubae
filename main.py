@@ -55,7 +55,7 @@ async def start_web_server() -> web.AppRunner:
 
 
 async def main() -> None:
-    from services.scheduler import scheduler_loop, broadcast_manager
+    from services.scheduler import scheduler_loop
     from utils.set_bot_commands import set_default_commands, set_admin_commands
 
     runner = await start_web_server()
@@ -79,8 +79,13 @@ async def main() -> None:
             scheduler_task.cancel()
             await asyncio.gather(scheduler_task, return_exceptions=True)
 
-        # Let the in-process broadcast queue finish before closing Telegram.
+        # Finish in-flight schedule dispatches before draining the worker queue.
         from services import scheduler as scheduler_service
+        if scheduler_service.schedule_tasks:
+            await asyncio.gather(
+                *list(scheduler_service.schedule_tasks),
+                return_exceptions=True,
+            )
         if scheduler_service.broadcast_manager is not None:
             await scheduler_service.broadcast_manager.stop()
 
