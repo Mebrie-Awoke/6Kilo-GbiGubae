@@ -43,13 +43,13 @@ class BatchInputTests(unittest.TestCase):
     def test_personalized_announcement_includes_amharic_greeting_and_name(self):
         self.assertEqual(
             personalize_announcement("Mebrie Awoke", "Meeting starts at 5 PM."),
-            "ሰላም Mebrie Awoke!\\n\\nMeeting starts at 5 PM.",
+            "ሰላም Mebrie Awoke!\n\nMeeting starts at 5 PM.",
         )
 
     def test_personalized_announcement_handles_missing_name(self):
         self.assertEqual(
             personalize_announcement(None, "Important update."),
-            "ሰላም there!\\n\\nImportant update.",
+            "ሰላም there!\n\nImportant update.",
         )
 
 
