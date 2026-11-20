@@ -89,11 +89,8 @@ async def lifespan(app: FastAPI):
             await asyncio.gather(polling_task, return_exceptions=True)
         scheduler_task.cancel()
         await asyncio.gather(scheduler_task, return_exceptions=True)
-        if settings.webhook_base_url:
-            try:
-                await bot.delete_webhook()
-            except Exception:
-                logger.exception("Could not remove Telegram webhook during shutdown.")
+        # Keep the webhook registered during Render restarts and deployments.
+        # Telegram will retry pending updates while the new instance starts.
         await bot.session.close()
         await store.close()
 
