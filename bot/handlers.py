@@ -576,7 +576,11 @@ async def add_admin_command(message: Message, store: MongoStore, settings: Setti
         await message.answer("Member not found. Ask the user to register with /start first.")
         return
     if await store.add_admin(target_id, message.from_user.id):
-        await message.answer(f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\nTelegram ID: <code>{target_id}</code>")
+        await message.answer(
+            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
+            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
+        )
+        await notify_new_admin(message.bot, target_id, member)
     else:
         await message.answer("This member is already an administrator.")
 
@@ -626,10 +630,11 @@ async def admin_add_selected(callback: CallbackQuery, store: MongoStore, setting
         return
     if await store.add_admin(target_id, callback.from_user.id):
         await callback.message.edit_text(
-            f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\n"
-            f"Academic year: {escape(member['batch'])}\nTelegram ID: <code>{target_id}</code>"
+            f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\n"
+            f"Academic year: {escape(member['batch'])}\\nTelegram ID: <code>{target_id}</code>"
         )
-        await callback.answer("Administrator access granted.")
+        await notify_new_admin(callback.bot, target_id, member)
+        await callback.answer("Administrator access granted and notification sent.")
     else:
         await callback.answer("This member is already an administrator.", show_alert=True)
 
@@ -643,23 +648,148 @@ async def admin_add_close(callback: CallbackQuery, settings: Settings):
     await callback.answer()
 
 
+def admin_removal_keyboard(admins: list[dict], page: int = 0) -> InlineKeyboardMarkup:
+    page_size = 8
+    start = page * page_size
+    visible = admins[start:start + page_size]
+    rows = [
+        [InlineKeyboardButton(
+            text=f"{item['name'][:38]} · {item['batch']}",
+            callback_data=f"admin:remove:{item['telegram_id']}",
+        )]
+        for item in visible
+    ]
+    navigation = []
+    if page > 0:
+        navigation.append(InlineKeyboardButton(text="⬅️ Previous", callback_data=f"admin:remove_page:{page - 1}"))
+    if start + page_size < len(admins):
+        navigation.append(InlineKeyboardButton(text="Next ➡️", callback_data=f"admin:remove_page:{page + 1}"))
+    if navigation:
+        rows.append(navigation)
+    rows.append([InlineKeyboardButton(text="✖ Close", callback_data="admin:remove_close")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def get_removable_admins(store: MongoStore) -> list[dict]:
+    result = []
+    for item in await store.list_admins():
+        member = await store.get_user(item["telegram_id"])
+        result.append({
+            "telegram_id": item["telegram_id"],
+            "name": member["name"] if member else "Unknown member",
+            "batch": member["batch"] if member else "Unregistered",
+        })
+    return result
+
+
+async def show_admin_removal(message: Message, store: MongoStore, page: int = 0):
+    admins = await get_removable_admins(store)
+    if not admins:
+        await message.answer("There are no additional administrators to remove.")
+        return
+    page = max(0, min(page, (len(admins) - 1) // 8))
+    await message.answer(
+        "🗑 <b>Remove Administrator</b>\\n\\n"
+        "Select an administrator to revoke their access.\\n"
+        f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(admins))} of {len(admins)} administrators.",
+        reply_markup=admin_removal_keyboard(admins, page),
+    )
+
+
+async def notify_new_admin(bot, target_id: int, member: dict) -> None:
+    """Send the newly promoted member a private onboarding message."""
+    onboarding = (
+        f"🛡 <b>You are now an administrator of 6Kilo GbiGubae!</b>\\n\\n"
+        f"Hello {escape(member.get('name') or 'there')},\\n"
+        "Your administrator access is active. You can now:\\n"
+        "• View community and membership statistics\\n"
+        "• View registered members\\n"
+        "• Send announcements to all members or a specific academic year\\n"
+        "• Schedule and manage announcements\\n\\n"
+        "Open the bot and send /admin to access your administrator workspace.\\n"
+        "Please use these permissions responsibly."
+    )
+    try:
+        await bot.send_message(target_id, onboarding)
+    except Exception:
+        logger.exception("Could not notify newly promoted administrator %s", target_id)
+
+
 @router.message(Command("remove_admin"))
 async def remove_admin_command(message: Message, store: MongoStore, settings: Settings):
     if not is_super_admin(settings, message.from_user.id if message.from_user else None):
         await message.answer("⛔ Only the super admin can manage administrator access.")
         return
+    payload = command_payload(message)
+    if not payload:
+        await show_admin_removal(message, store)
+        return
     try:
-        target_id = int(command_payload(message))
+        target_id = int(payload)
         if target_id <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("Usage: /remove_admin TELEGRAM_ID")
+        await message.answer("Usage: /remove_admin or /remove_admin TELEGRAM_ID")
         return
     if await store.remove_admin(target_id, settings.super_admin_id):
         await message.answer(f"✅ Administrator access revoked for <code>{target_id}</code>.")
     else:
         await message.answer("No removable administrator with that Telegram ID was found.")
 
+
+@router.callback_query(F.data.startswith("admin:remove_page:"))
+async def admin_remove_page(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Only the super admin can manage administrators.", show_alert=True)
+        return
+    try:
+        page = int(callback.data.rsplit(":", 1)[1])
+    except (ValueError, AttributeError):
+        await callback.answer("Invalid page.", show_alert=True)
+        return
+    admins = await get_removable_admins(store)
+    if not admins:
+        await callback.message.edit_text("There are no additional administrators to remove.")
+    else:
+        page = max(0, min(page, (len(admins) - 1) // 8))
+        await callback.message.edit_text(
+            "🗑 <b>Remove Administrator</b>\\n\\n"
+            "Select an administrator to revoke their access.\\n"
+            f"Showing {page * 8 + 1}–{min((page + 1) * 8, len(admins))} of {len(admins)} administrators.",
+            reply_markup=admin_removal_keyboard(admins, page),
+        )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:remove:"))
+async def admin_remove_selected(callback: CallbackQuery, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Only the super admin can manage administrators.", show_alert=True)
+        return
+    try:
+        target_id = int(callback.data.rsplit(":", 1)[1])
+    except (ValueError, AttributeError):
+        await callback.answer("Invalid administrator selection.", show_alert=True)
+        return
+    member = await store.get_user(target_id)
+    if await store.remove_admin(target_id, settings.super_admin_id):
+        name = escape(member["name"]) if member else str(target_id)
+        await callback.message.edit_text(
+            f"✅ <b>Administrator access removed</b>\\nName: {name}\\n"
+            f"Telegram ID: <code>{target_id}</code>"
+        )
+        await callback.answer("Administrator access revoked.")
+    else:
+        await callback.answer("This user is no longer an additional administrator.", show_alert=True)
+
+
+@router.callback_query(F.data == "admin:remove_close")
+async def admin_remove_close(callback: CallbackQuery, settings: Settings):
+    if not is_super_admin(settings, callback.from_user.id):
+        await callback.answer("Access denied.", show_alert=True)
+        return
+    await callback.message.edit_text("Administrator removal closed.")
+    await callback.answer()
 
 @router.message(Command("admins"))
 async def list_admins_command(message: Message, store: MongoStore, settings: Settings):
@@ -674,7 +804,7 @@ async def list_admins_command(message: Message, store: MongoStore, settings: Set
         member = await store.get_user(item["telegram_id"])
         name = escape(member["name"]) if member else "Unknown member"
         lines.append(f"• {name} — <code>{item['telegram_id']}</code>")
-    lines.append("\nUse /add_admin ID or /remove_admin ID.")
+    lines.append("\nUse /add_admin or /remove_admin to select members.")
     await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
@@ -693,7 +823,7 @@ async def help_command(message: Message, settings: Settings, store: MongoStore):
             "/menu — Open the admin workspace\n"
             "/admins — List additional admins (super admin)\n"
             "/add_admin ID — Grant admin access (super admin)\n"
-            "/remove_admin ID — Revoke admin access (super admin)"
+            "/remove_admin — Select an admin to remove (super admin)"
         )
     else:
         await message.answer(
