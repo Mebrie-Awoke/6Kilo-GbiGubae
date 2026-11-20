@@ -3,7 +3,7 @@
 Uses the Ethiopian Amete Mihret epoch (JDN 1723856) and the
 Beyene–Kudlek four-year cycle. Stored schedule timestamps remain UTC.
 """
-from datetime import date, datetime, time, timedelta, tzinfo
+from datetime import date, datetime, time, tzinfo
 
 ETHIOPIAN_EPOCH_JDN = 1723856
 MONTHS = (
