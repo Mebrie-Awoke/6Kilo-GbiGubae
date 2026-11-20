@@ -17,6 +17,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column("schedules", sa.Column("monthly_day", sa.Integer(), nullable=True))
+    op.execute(
+        "UPDATE schedules SET monthly_day = EXTRACT(DAY FROM next_run)::integer "
+        "WHERE type = 'MONTHLY' AND next_run IS NOT NULL"
+    )
+
     op.create_table(
         "telegram_updates",
         sa.Column("update_id", sa.BigInteger(), primary_key=True),
@@ -92,6 +98,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_column("schedules", "monthly_day")
     op.drop_index("ix_broadcast_deliveries_status", table_name="broadcast_deliveries")
     op.drop_table("broadcast_deliveries")
     op.drop_index("ix_broadcast_runs_status", table_name="broadcast_runs")
