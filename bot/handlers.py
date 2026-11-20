@@ -28,12 +28,16 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-def is_admin(settings: Settings, user_id: int | None) -> bool:
+async def is_admin(settings: Settings, store: MongoStore, user_id: int | None) -> bool:
+    return bool(user_id and await store.is_admin(user_id, settings.super_admin_id))
+
+
+async def admin_only(settings: Settings, message: Message, store: MongoStore) -> bool:
+    return await is_admin(settings, store, message.from_user.id if message.from_user else None)
+
+
+def is_super_admin(settings: Settings, user_id: int | None) -> bool:
     return bool(user_id and user_id == settings.super_admin_id)
-
-
-def admin_only(settings: Settings, message: Message) -> bool:
-    return is_admin(settings, message.from_user.id if message.from_user else None)
 
 
 def command_payload(message: Message) -> str:
@@ -159,7 +163,7 @@ async def start_registration(message: Message, state: FSMContext) -> None:
 @router.message(CommandStart())
 async def start(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
     user_id = message.from_user.id
-    if is_admin(settings, user_id):
+    if await is_admin(settings, store, user_id):
         await show_admin_home(message, state, store, settings)
         return
     user = await store.get_user(user_id)
@@ -171,7 +175,7 @@ async def start(message: Message, state: FSMContext, store: MongoStore, settings
 
 @router.message(Command("admin"))
 async def admin_home(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This workspace is restricted to administrators.")
         return
     await show_admin_home(message, state, store, settings)
@@ -179,7 +183,7 @@ async def admin_home(message: Message, state: FSMContext, store: MongoStore, set
 
 @router.message(Command("menu"))
 async def menu_command(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
-    if admin_only(settings, message):
+    if await admin_only(settings, message, store):
         await show_admin_home(message, state, store, settings)
         return
     user = await store.get_user(message.from_user.id)
@@ -191,7 +195,7 @@ async def menu_command(message: Message, state: FSMContext, store: MongoStore, s
 
 @router.message(F.text == "📊 Overview")
 async def admin_overview_menu(message: Message, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
     counts = {batch: 0 for batch in settings.batches}
@@ -206,13 +210,13 @@ async def admin_overview_menu(message: Message, store: MongoStore, settings: Set
 
 @router.message(F.text == "🔄 Refresh Menu")
 async def refresh_admin_menu(message: Message, state: FSMContext, store: MongoStore, settings: Settings):
-    if admin_only(settings, message):
+    if await admin_only(settings, message, store):
         await show_admin_home(message, state, store, settings)
 
 
 @router.callback_query(F.data == "admin:overview")
 async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
@@ -229,7 +233,7 @@ async def admin_overview(callback: CallbackQuery, store: MongoStore, settings: S
 
 @router.callback_query(F.data == "admin:members")
 async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
@@ -247,7 +251,7 @@ async def admin_members(callback: CallbackQuery, store: MongoStore, settings: Se
 
 @router.callback_query(F.data == "admin:schedules")
 async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     schedules = await store.list_schedules()
@@ -267,8 +271,8 @@ async def admin_schedules(callback: CallbackQuery, store: MongoStore, settings: 
 
 
 @router.callback_query(F.data == "admin:help")
-async def admin_help(callback: CallbackQuery, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+async def admin_help(callback: CallbackQuery, settings: Settings, store: MongoStore):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     text = (
@@ -286,7 +290,7 @@ async def admin_help(callback: CallbackQuery, settings: Settings):
 
 @router.callback_query(F.data == "admin:broadcast")
 async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     await state.set_state(AdminBroadcast.choosing_target)
@@ -300,7 +304,7 @@ async def begin_broadcast(callback: CallbackQuery, state: FSMContext, settings: 
 
 @router.callback_query(F.data.startswith("broadcast:target:"))
 async def choose_broadcast_target(callback: CallbackQuery, state: FSMContext, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.choosing_target.state:
@@ -348,7 +352,7 @@ async def compose_broadcast(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "broadcast:edit")
 async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.confirming.state:
@@ -361,7 +365,7 @@ async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: S
 
 @router.callback_query(F.data == "broadcast:confirm")
 async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: MongoStore, settings: Settings):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.confirming.state:
@@ -390,7 +394,7 @@ async def confirm_broadcast(callback: CallbackQuery, state: FSMContext, store: M
 
 @router.callback_query(F.data == "broadcast:cancel")
 async def cancel_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings, store: MongoStore):
-    if not is_admin(settings, callback.from_user.id):
+    if not await is_admin(settings, store, callback.from_user.id):
         await callback.answer("Access denied.", show_alert=True)
         return
     await state.clear()
@@ -502,16 +506,77 @@ async def edit_batch(message: Message, state: FSMContext, store: MongoStore, set
 @router.message(Command("cancel"))
 async def cancel(message: Message, state: FSMContext, settings: Settings, store: MongoStore):
     await state.clear()
-    if admin_only(settings, message):
+    if await admin_only(settings, message, store):
         await show_admin_home(message, state, store, settings)
     else:
         await message.answer("Your current action has been cancelled.", reply_markup=ReplyKeyboardRemove())
 
 
+
+@router.message(Command("add_admin"))
+async def add_admin_command(message: Message, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, message.from_user.id if message.from_user else None):
+        await message.answer("⛔ Only the super admin can manage administrator access.")
+        return
+    try:
+        target_id = int(command_payload(message))
+        if target_id <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Usage: /add_admin TELEGRAM_ID\\nThe user must already be registered.")
+        return
+    if target_id == settings.super_admin_id:
+        await message.answer("This account is already the super admin.")
+        return
+    member = await store.get_user(target_id)
+    if not member:
+        await message.answer("Member not found. Ask the user to register with /start first.")
+        return
+    if await store.add_admin(target_id, message.from_user.id):
+        await message.answer(f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\nTelegram ID: <code>{target_id}</code>")
+    else:
+        await message.answer("This member is already an administrator.")
+
+
+@router.message(Command("remove_admin"))
+async def remove_admin_command(message: Message, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, message.from_user.id if message.from_user else None):
+        await message.answer("⛔ Only the super admin can manage administrator access.")
+        return
+    try:
+        target_id = int(command_payload(message))
+        if target_id <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Usage: /remove_admin TELEGRAM_ID")
+        return
+    if await store.remove_admin(target_id, settings.super_admin_id):
+        await message.answer(f"✅ Administrator access revoked for <code>{target_id}</code>.")
+    else:
+        await message.answer("No removable administrator with that Telegram ID was found.")
+
+
+@router.message(Command("admins"))
+async def list_admins_command(message: Message, store: MongoStore, settings: Settings):
+    if not is_super_admin(settings, message.from_user.id if message.from_user else None):
+        await message.answer("⛔ Only the super admin can view administrator management.")
+        return
+    admins = await store.list_admins()
+    lines = ["🛡 <b>Additional Administrators</b>", "━━━━━━━━━━━━━━━━━━"]
+    if not admins:
+        lines.append("No additional administrators have been added.")
+    for item in admins:
+        member = await store.get_user(item["telegram_id"])
+        name = escape(member["name"]) if member else "Unknown member"
+        lines.append(f"• {name} — <code>{item['telegram_id']}</code>")
+    lines.append("\\nUse /add_admin ID or /remove_admin ID.")
+    await message.answer("\\n".join(lines), reply_markup=admin_menu())
+
+
 @router.message(F.text == "❔ Help & Commands")
 @router.message(Command("help"))
-async def help_command(message: Message, settings: Settings):
-    if admin_only(settings, message):
+async def help_command(message: Message, settings: Settings, store: MongoStore):
+    if await admin_only(settings, message, store):
         await message.answer(
             "🛡 <b>Administrator Commands</b>\n\n"
             "/admin — Open the admin workspace\n"
@@ -520,7 +585,10 @@ async def help_command(message: Message, settings: Settings):
             "/schedule YYYY-MM-DD HH:MM | batch | message — Schedule using Ethiopian date (E.C.)\n"
             "/schedules — View scheduled messages\n"
             "/cancel_schedule ID — Cancel a scheduled message\n"
-            "/menu — Open the admin workspace"
+            "/menu — Open the admin workspace\\n"
+            "/admins — List additional admins (super admin)\\n"
+            "/add_admin ID — Grant admin access (super admin)\\n"
+            "/remove_admin ID — Revoke admin access (super admin)"
         )
     else:
         await message.answer(
@@ -536,7 +604,7 @@ async def help_command(message: Message, settings: Settings):
 @router.message(F.text == "👥 Members")
 @router.message(Command("users"))
 async def users_command(message: Message, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
@@ -574,7 +642,7 @@ async def send_to_target(message: Message, store: MongoStore, target: str, text:
 @router.message(F.text == "📣 New Announcement")
 @router.message(Command("broadcast"))
 async def broadcast(message: Message, state: FSMContext, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     payload = command_payload(message)
@@ -595,7 +663,7 @@ async def broadcast(message: Message, state: FSMContext, settings: Settings):
 @router.message(F.text == "🗓 Schedule Announcement")
 @router.message(Command("schedule"))
 async def schedule_message(message: Message, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     parts = [part.strip() for part in command_payload(message).split("|", 2)]
@@ -635,7 +703,7 @@ async def schedule_message(message: Message, store: MongoStore, settings: Settin
 @router.message(F.text == "📋 Scheduled Messages")
 @router.message(Command("schedules"))
 async def list_schedules(message: Message, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     schedules = await store.list_schedules()
@@ -655,7 +723,7 @@ async def list_schedules(message: Message, store: MongoStore, settings: Settings
 @router.message(F.text == "🗑 Cancel Scheduled Message")
 @router.message(Command("cancel_schedule"))
 async def cancel_schedule(message: Message, store: MongoStore, settings: Settings):
-    if not admin_only(settings, message):
+    if not await admin_only(settings, message, store):
         await message.answer("⛔ Access denied. This command is restricted to administrators.")
         return
     try:
