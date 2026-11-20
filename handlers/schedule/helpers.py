@@ -8,6 +8,7 @@ from sqlalchemy import select
 from config import SUPER_ADMIN_ID
 from db.models import Schedule, User
 from db.session import AsyncSessionLocal
+from db.permissions import is_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ async def ensure_user_exists(user_id: int, username: str | None = None) -> bool:
                 )
                 return is_super_admin
 
-            return bool(user.is_admin or user_id == SUPER_ADMIN_ID)
+            return is_admin_user(user_id, user.is_admin, SUPER_ADMIN_ID)
         except Exception:
             await session.rollback()
             logger.exception("Could not verify admin access for Telegram ID %s", user_id)
