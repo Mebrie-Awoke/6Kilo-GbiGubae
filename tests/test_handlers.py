@@ -2,6 +2,7 @@ import unittest
 
 from bot.config import Settings
 from bot.handlers import display_batch, normalize_batch, valid_target
+from bot.messaging import personalize_announcement
 
 
 class BatchInputTests(unittest.TestCase):
@@ -38,6 +39,18 @@ class BatchInputTests(unittest.TestCase):
     def test_batch_display_is_english(self):
         self.assertEqual(display_batch("4th Year"), "4th Year")
         self.assertEqual(display_batch("all"), "All Members")
+
+    def test_personalized_announcement_includes_amharic_greeting_and_name(self):
+        self.assertEqual(
+            personalize_announcement("Mebrie Awoke", "Meeting starts at 5 PM."),
+            "ሰላም Mebrie Awoke!\\n\\nMeeting starts at 5 PM.",
+        )
+
+    def test_personalized_announcement_handles_missing_name(self):
+        self.assertEqual(
+            personalize_announcement(None, "Important update."),
+            "ሰላም there!\\n\\nImportant update.",
+        )
 
 
 if __name__ == "__main__":
