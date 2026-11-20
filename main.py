@@ -40,22 +40,22 @@ async def readiness(request: web.Request) -> web.Response:
 
 async def configure_commands(bot: Bot, admin_id: int) -> None:
     await bot.set_my_commands([
-        BotCommand(command="start", description="Register / restart"),
-        BotCommand(command="profile", description="View your profile"),
-        BotCommand(command="edit_batch", description="Change your batch"),
-        BotCommand(command="help", description="Show commands"),
+        BotCommand(command="start", description="ምዝገባ / እንደገና ጀምር"),
+        BotCommand(command="profile", description="መገለጫዎን ይመልከቱ"),
+        BotCommand(command="edit_batch", description="የትምህርት ዓመት ይቀይሩ"),
+        BotCommand(command="help", description="ትዕዛዞችን ይመልከቱ"),
     ])
     await bot.set_my_commands([
-        BotCommand(command="start", description="Open admin workspace"),
-        BotCommand(command="admin", description="Open admin workspace"),
-        BotCommand(command="menu", description="Open admin workspace"),
-        BotCommand(command="users", description="Membership report"),
-        BotCommand(command="broadcast", description="Send an announcement"),
-        BotCommand(command="schedule", description="Schedule a message"),
-        BotCommand(command="schedules", description="List scheduled messages"),
-        BotCommand(command="cancel_schedule", description="Cancel a schedule"),
-        BotCommand(command="help", description="Show commands"),
-        BotCommand(command="cancel", description="Cancel current workflow"),
+        BotCommand(command="start", description="የአስተዳዳሪ ማዕከል ይክፈቱ"),
+        BotCommand(command="admin", description="የአስተዳዳሪ ማዕከል ይክፈቱ"),
+        BotCommand(command="menu", description="የአስተዳዳሪ ማዕከል ይክፈቱ"),
+        BotCommand(command="users", description="የአባላት ሪፖርት"),
+        BotCommand(command="broadcast", description="ማስታወቂያ ይላኩ"),
+        BotCommand(command="schedule", description="መልዕክት ያቅዱ"),
+        BotCommand(command="schedules", description="የታቀዱ መልዕክቶችን ይመልከቱ"),
+        BotCommand(command="cancel_schedule", description="መርሐግብር ይሰርዙ"),
+        BotCommand(command="help", description="ትዕዛዞችን ይመልከቱ"),
+        BotCommand(command="cancel", description="አሁን ያለውን ሂደት ያቋርጡ"),
     ], scope=BotCommandScopeChat(chat_id=admin_id))
 
 
