@@ -288,8 +288,8 @@ async def compose_broadcast(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "broadcast:edit")
-async def edit_broadcast(callback: CallbackQuery, state: FSMContext):
-    if not is_admin_from_callback(callback):
+async def edit_broadcast(callback: CallbackQuery, state: FSMContext, settings: Settings):
+    if not is_admin(settings, callback.from_user.id):
         await callback.answer("Not authorized.", show_alert=True)
         return
     if await state.get_state() != AdminBroadcast.confirming.state:
@@ -298,11 +298,6 @@ async def edit_broadcast(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AdminBroadcast.entering_message)
     await callback.message.edit_text("✏️ Send the revised announcement text. Use /cancel to stop.")
     await callback.answer()
-
-
-def is_admin_from_callback(callback: CallbackQuery) -> bool:
-    # Callback authorization is also checked against settings in each action handler.
-    return bool(callback.from_user)
 
 
 @router.callback_query(F.data == "broadcast:confirm")
