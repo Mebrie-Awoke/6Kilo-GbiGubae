@@ -59,7 +59,6 @@ def valid_target(target: str, settings: Settings) -> bool:
     return target.casefold() == "all" or normalize_batch(target, settings) is not None
 
 
-
 def display_batch(batch: str) -> str:
     return "All Members" if batch.casefold() == "all" else batch
 
@@ -81,12 +80,13 @@ def member_menu() -> InlineKeyboardMarkup:
 
 
 def admin_menu() -> InlineKeyboardMarkup:
+    """A clean, single-column menu matching the member academic-year picker."""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📊 Overview", callback_data="admin:overview"),
-         InlineKeyboardButton(text="👥 Members", callback_data="admin:members")],
-        [InlineKeyboardButton(text="📣 New Announcement", callback_data="admin:broadcast"),
-         InlineKeyboardButton(text="🗓 Scheduled Messages", callback_data="admin:schedules")],
-        [InlineKeyboardButton(text="❔ Help", callback_data="admin:help")],
+        [InlineKeyboardButton(text="📊  Overview", callback_data="admin:overview")],
+        [InlineKeyboardButton(text="👥  Members", callback_data="admin:members")],
+        [InlineKeyboardButton(text="📣  New Announcement", callback_data="admin:broadcast")],
+        [InlineKeyboardButton(text="🗓  Scheduled Messages", callback_data="admin:schedules")],
+        [InlineKeyboardButton(text="❔  Help & Commands", callback_data="admin:help")],
     ])
 
 
@@ -111,12 +111,20 @@ def confirmation_keyboard() -> InlineKeyboardMarkup:
 async def show_admin_home(message: Message, state: FSMContext, store: MongoStore, settings: Settings) -> None:
     await state.clear()
     users = [u for u in await store.list_users() if u["telegram_id"] != settings.super_admin_id]
+    counts = {batch: 0 for batch in settings.batches}
+    for user in users:
+        if user.get("batch") in counts:
+            counts[user["batch"]] += 1
+    batch_lines = [f"  • {escape(display_batch(batch))}: <b>{count}</b>" for batch, count in counts.items()]
     await message.answer(
-        "🛡 <b>6Kilo GbiGubae | Admin Workspace</b>\n"
+        "🛡 <b>6Kilo GbiGubae</b>\n"
+        "<b>ADMINISTRATION</b>\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"📅 Ethiopian date: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
-        f"👥 Registered members: <b>{len(users)}</b>\n"
-        "Choose an action below to manage the community.",
+        f"📅 {format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}\n"
+        f"👥 Registered members: <b>{len(users)}</b>\n\n"
+        "<b>MEMBERS BY ACADEMIC YEAR</b>\n"
+        + "\n".join(batch_lines)
+        + "\n\nSelect a section to continue:",
         reply_markup=admin_menu(),
     )
 
