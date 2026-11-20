@@ -523,7 +523,7 @@ async def add_admin_command(message: Message, store: MongoStore, settings: Setti
         if target_id <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("Usage: /add_admin TELEGRAM_ID\\nThe user must already be registered.")
+        await message.answer("Usage: /add_admin TELEGRAM_ID\nThe user must already be registered.")
         return
     if target_id == settings.super_admin_id:
         await message.answer("This account is already the super admin.")
@@ -533,7 +533,7 @@ async def add_admin_command(message: Message, store: MongoStore, settings: Setti
         await message.answer("Member not found. Ask the user to register with /start first.")
         return
     if await store.add_admin(target_id, message.from_user.id):
-        await message.answer(f"✅ <b>Administrator added</b>\\nName: {escape(member['name'])}\\nTelegram ID: <code>{target_id}</code>")
+        await message.answer(f"✅ <b>Administrator added</b>\nName: {escape(member['name'])}\nTelegram ID: <code>{target_id}</code>")
     else:
         await message.answer("This member is already an administrator.")
 
@@ -569,8 +569,8 @@ async def list_admins_command(message: Message, store: MongoStore, settings: Set
         member = await store.get_user(item["telegram_id"])
         name = escape(member["name"]) if member else "Unknown member"
         lines.append(f"• {name} — <code>{item['telegram_id']}</code>")
-    lines.append("\\nUse /add_admin ID or /remove_admin ID.")
-    await message.answer("\\n".join(lines), reply_markup=admin_menu())
+    lines.append("\nUse /add_admin ID or /remove_admin ID.")
+    await message.answer("\n".join(lines), reply_markup=admin_menu())
 
 
 @router.message(F.text == "❔ Help & Commands")
