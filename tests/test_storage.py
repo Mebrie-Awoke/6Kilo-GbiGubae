@@ -12,6 +12,21 @@ class MongoStoreTests(unittest.IsolatedAsyncioTestCase):
         self.store.users.find_one = AsyncMock(return_value={
             "_id": 12345, "name": "Abebe", "batch": "1st Year"
         })
+        self.store.locks = MagicMock()
+        self.store.locks.find_one_and_update = AsyncMock(return_value={"_id": "scheduler"})
+        self.store.locks.update_one = AsyncMock(return_value=MagicMock(modified_count=1))
+
+    async def test_scheduler_lock_acquire(self):
+        self.assertTrue(await self.store.acquire_scheduler_lock("worker-a"))
+        self.store.locks.find_one_and_update.assert_awaited_once()
+
+    async def test_scheduler_lock_renewal(self):
+        self.assertTrue(await self.store.renew_scheduler_lock("worker-a"))
+        self.store.locks.update_one.assert_awaited_once()
+
+    async def test_scheduler_lock_release(self):
+        await self.store.release_scheduler_lock("worker-a")
+        self.store.locks.update_one.assert_awaited_once()
 
     async def test_save_user_uses_telegram_id_as_document_id(self):
         await self.store.save_user(12345, " Abebe ", "1st Year")
