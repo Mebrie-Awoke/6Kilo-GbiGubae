@@ -34,11 +34,13 @@ For Linux/macOS, activate the virtual environment with `source .venv/bin/activat
 
 ## Deployment
 
-The repository includes a Render blueprint in `render.yaml`. Configure `TG_BOT_TOKEN` (or `BOT_TOKEN`), `SUPER_ADMIN_ID`, and `DATABASE_URL` as Render environment variables. Run database migrations with:
+The repository includes a Render blueprint in `render.yaml`. Configure `TG_BOT_TOKEN` (or `BOT_TOKEN`), `SUPER_ADMIN_ID`, and `DATABASE_URL` as Render environment variables. Automatic deployment is disabled so the database migration can be reviewed and backed up before a release. After confirming the production database is backed up, run:
 
 ```bash
 python -m alembic upgrade head
 ```
+
+Then manually deploy the service from Render. Do not deploy the new application code before the migration has completed successfully.
 
 Health endpoints:
 
