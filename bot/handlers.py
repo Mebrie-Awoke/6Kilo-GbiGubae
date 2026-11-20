@@ -100,11 +100,12 @@ async def show_admin_home(message: Message, state: FSMContext, store: JsonStore,
     )
 
 
-async def show_member_home(message: Message, user: dict, state: FSMContext) -> None:
+async def show_member_home(message: Message, user: dict, state: FSMContext, settings: Settings) -> None:
     await state.clear()
     await message.answer(
         f"👋 Welcome back, <b>{escape(user['name'])}</b>!\n\n"
         f"🎓 Batch: <b>{escape(user['batch'])}</b>\n"
+        f"📅 Today: <b>{format_ethiopian(datetime.now(ZoneInfo(settings.timezone)), ZoneInfo(settings.timezone))}</b>\n"
         "Your community account is ready.",
         reply_markup=member_menu(),
     )
@@ -128,7 +129,7 @@ async def start(message: Message, state: FSMContext, store: JsonStore, settings:
         return
     user = await store.get_user(user_id)
     if user:
-        await show_member_home(message, user, state)
+        await show_member_home(message, user, state, settings)
         return
     await start_registration(message, state)
 
@@ -150,7 +151,7 @@ async def menu_command(message: Message, state: FSMContext, store: JsonStore, se
     if not user:
         await start_registration(message, state)
         return
-    await show_member_home(message, user, state)
+    await show_member_home(message, user, state, settings)
 
 
 @router.callback_query(F.data == "admin:overview")
