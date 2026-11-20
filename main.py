@@ -46,13 +46,16 @@ async def configure_commands(bot: Bot, admin_id: int) -> None:
         BotCommand(command="help", description="Show commands"),
     ])
     await bot.set_my_commands([
-        BotCommand(command="start", description="Register / restart"),
-        BotCommand(command="users", description="Count registered users"),
+        BotCommand(command="start", description="Open admin workspace"),
+        BotCommand(command="admin", description="Open admin workspace"),
+        BotCommand(command="menu", description="Open admin workspace"),
+        BotCommand(command="users", description="Membership report"),
         BotCommand(command="broadcast", description="Send an announcement"),
         BotCommand(command="schedule", description="Schedule a message"),
         BotCommand(command="schedules", description="List scheduled messages"),
         BotCommand(command="cancel_schedule", description="Cancel a schedule"),
         BotCommand(command="help", description="Show commands"),
+        BotCommand(command="cancel", description="Cancel current workflow"),
     ], scope=BotCommandScopeChat(chat_id=admin_id))
 
 
